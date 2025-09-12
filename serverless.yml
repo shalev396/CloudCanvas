@@ -1,0 +1,159 @@
+org: shalev396
+
+app: CloudCanvas
+
+service: CloudCanvas-Database
+
+frameworkVersion: ^4.0.0
+
+provider:
+  name: aws
+  stage: ${opt:stage}
+  region: il-central-1
+
+# Custom Configuration
+custom:
+  # Table names
+  categoriesTableName: cloudcanvas-categories-${sls:stage}
+  servicesTableName: cloudcanvas-services-${sls:stage}
+
+# Additional AWS resources
+resources:
+  Resources:
+    # DynamoDB table for Categories
+    CategoriesTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:custom.categoriesTableName}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        StreamSpecification:
+          StreamViewType: NEW_AND_OLD_IMAGES
+        PointInTimeRecoverySpecification:
+          PointInTimeRecoveryEnabled: true
+        Tags:
+          - Key: Environment
+            Value: ${sls:stage}
+          - Key: Service
+            Value: cloudcanvas
+          - Key: Application
+            Value: cloudcanvas-infrastructure
+
+    # DynamoDB table for Services
+    ServicesTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:custom.servicesTableName}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: categoryId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: CategoryIndex
+            KeySchema:
+              - AttributeName: categoryId
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+        StreamSpecification:
+          StreamViewType: NEW_AND_OLD_IMAGES
+        PointInTimeRecoverySpecification:
+          PointInTimeRecoveryEnabled: true
+        Tags:
+          - Key: Environment
+            Value: ${sls:stage}
+          - Key: Service
+            Value: cloudcanvas
+          - Key: Application
+            Value: cloudcanvas-infrastructure
+
+    # IAM User for Vercel app to access DynamoDB
+    CloudCanvasVercelUser:
+      Type: AWS::IAM::User
+      Properties:
+        UserName: cloudcanvas-vercel-${sls:stage}
+        Tags:
+          - Key: Environment
+            Value: ${sls:stage}
+          - Key: Service
+            Value: cloudcanvas
+          - Key: Purpose
+            Value: vercel-dynamodb-access
+
+    # IAM Policy for DynamoDB access
+    CloudCanvasVercelPolicy:
+      Type: AWS::IAM::Policy
+      Properties:
+        PolicyName: cloudcanvas-dynamodb-policy-${sls:stage}
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+                - dynamodb:Scan
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:DeleteItem
+                - dynamodb:BatchGetItem
+                - dynamodb:BatchWriteItem
+                - dynamodb:DescribeTable
+              Resource:
+                - !GetAtt CategoriesTable.Arn
+                - !GetAtt ServicesTable.Arn
+                - !Sub "${ServicesTable.Arn}/index/CategoryIndex"
+        Users:
+          - Ref: CloudCanvasVercelUser
+
+    # Access Key for the IAM User
+    CloudCanvasVercelAccessKey:
+      Type: AWS::IAM::AccessKey
+      Properties:
+        UserName:
+          Ref: CloudCanvasVercelUser
+
+  Outputs:
+    CategoriesTableName:
+      Description: Categories table name
+      Value: ${self:custom.categoriesTableName}
+      Export:
+        Name: ${sls:stage}-cloudcanvas-categories-table
+
+    ServicesTableName:
+      Description: Services table name
+      Value: ${self:custom.servicesTableName}
+      Export:
+        Name: ${sls:stage}-cloudcanvas-services-table
+
+    DynamoDBRegion:
+      Description: AWS region where DynamoDB tables are deployed
+      Value: ${aws:region}
+      Export:
+        Name: ${sls:stage}-cloudcanvas-region
+
+    VercelUserAccessKeyId:
+      Description: Access Key ID for Vercel app
+      Value:
+        Ref: CloudCanvasVercelAccessKey
+      Export:
+        Name: ${sls:stage}-cloudcanvas-vercel-access-key-id
+
+    VercelUserSecretAccessKey:
+      Description: Secret Access Key for Vercel app (store securely)
+      Value:
+        Fn::GetAtt:
+          - CloudCanvasVercelAccessKey
+          - SecretAccessKey
+      Export:
+        Name: ${sls:stage}-cloudcanvas-vercel-secret-key
