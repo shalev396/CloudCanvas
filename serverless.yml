@@ -14,24 +14,33 @@ provider:
 # Custom Configuration
 custom:
   # Table names
-  categoriesTableName: cloudcanvas-categories-${sls:stage}
   servicesTableName: cloudcanvas-services-${sls:stage}
+  usersTableName: cloudcanvas-users-${sls:stage}
 
 # Additional AWS resources
 resources:
   Resources:
-    # DynamoDB table for Categories
-    CategoriesTable:
+    # DynamoDB table for Services
+    ServicesTable:
       Type: AWS::DynamoDB::Table
       Properties:
-        TableName: ${self:custom.categoriesTableName}
+        TableName: ${self:custom.servicesTableName}
         BillingMode: PAY_PER_REQUEST
         AttributeDefinitions:
           - AttributeName: id
             AttributeType: S
+          - AttributeName: category
+            AttributeType: S
         KeySchema:
           - AttributeName: id
             KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: CategoryIndex
+            KeySchema:
+              - AttributeName: category
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
         StreamSpecification:
           StreamViewType: NEW_AND_OLD_IMAGES
         PointInTimeRecoverySpecification:
@@ -44,24 +53,24 @@ resources:
           - Key: Application
             Value: cloudcanvas-infrastructure
 
-    # DynamoDB table for Services
-    ServicesTable:
+    # DynamoDB table for Users
+    UsersTable:
       Type: AWS::DynamoDB::Table
       Properties:
-        TableName: ${self:custom.servicesTableName}
+        TableName: ${self:custom.usersTableName}
         BillingMode: PAY_PER_REQUEST
         AttributeDefinitions:
           - AttributeName: id
             AttributeType: S
-          - AttributeName: categoryId
+          - AttributeName: email
             AttributeType: S
         KeySchema:
           - AttributeName: id
             KeyType: HASH
         GlobalSecondaryIndexes:
-          - IndexName: CategoryIndex
+          - IndexName: EmailIndex
             KeySchema:
-              - AttributeName: categoryId
+              - AttributeName: email
                 KeyType: HASH
             Projection:
               ProjectionType: ALL
@@ -110,9 +119,10 @@ resources:
                 - dynamodb:BatchWriteItem
                 - dynamodb:DescribeTable
               Resource:
-                - !GetAtt CategoriesTable.Arn
                 - !GetAtt ServicesTable.Arn
+                - !GetAtt UsersTable.Arn
                 - !Sub "${ServicesTable.Arn}/index/CategoryIndex"
+                - !Sub "${UsersTable.Arn}/index/EmailIndex"
         Users:
           - Ref: CloudCanvasVercelUser
 
@@ -124,17 +134,17 @@ resources:
           Ref: CloudCanvasVercelUser
 
   Outputs:
-    CategoriesTableName:
-      Description: Categories table name
-      Value: ${self:custom.categoriesTableName}
-      Export:
-        Name: ${sls:stage}-cloudcanvas-categories-table
-
     ServicesTableName:
       Description: Services table name
       Value: ${self:custom.servicesTableName}
       Export:
         Name: ${sls:stage}-cloudcanvas-services-table
+
+    UsersTableName:
+      Description: Users table name
+      Value: ${self:custom.usersTableName}
+      Export:
+        Name: ${sls:stage}-cloudcanvas-users-table
 
     DynamoDBRegion:
       Description: AWS region where DynamoDB tables are deployed
