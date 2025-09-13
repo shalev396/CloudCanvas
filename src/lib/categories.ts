@@ -201,19 +201,20 @@ export const CLOUD_PROVIDERS: CloudProvider[] = [
   {
     id: "aws",
     name: "aws",
-    displayName: "Amazon Web Services",
+    displayName: "AWS",
+    iconPath: "/aws/Architecture-Group/AWS-Cloud-logo_32.svg",
     enabled: true,
   },
   {
     id: "azure",
     name: "azure",
-    displayName: "Microsoft Azure",
+    displayName: "Azure",
     enabled: false,
   },
   {
     id: "gcp",
     name: "gcp",
-    displayName: "Google Cloud Platform",
+    displayName: "GCP",
     enabled: false,
   },
 ];

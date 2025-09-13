@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Search, Heart, ExternalLink } from "lucide-react";
+import { Search, ChevronDown, ChevronRight } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { AwsService, ServicesByCategory } from "@/lib/types";
@@ -37,62 +36,72 @@ async function fetchServices(): Promise<ServicesByCategory[]> {
 
 interface ServiceCardProps {
   service: AwsService;
-  favorites: string[];
-  onToggleFavorite: (serviceId: string) => void;
 }
 
-function ServiceCard({
-  service,
-  favorites,
-  onToggleFavorite,
-}: ServiceCardProps) {
+function ServiceCard({ service }: ServiceCardProps) {
   return (
-    <Card className="group hover:shadow-md transition-all duration-200 hover:scale-[1.02] bg-card/50 backdrop-blur border-border/50">
-      <CardContent className="p-6">
-        <div className="flex flex-col items-center space-y-4 text-center">
-          {/* Service Icon */}
-          <div className="relative w-12 h-12 flex-shrink-0">
+    <Link href={`/${service.category}/${service.slug}`} className="block">
+      <Card className="group hover:shadow-lg transition-all duration-300 hover:scale-[1.03] bg-card/60 backdrop-blur border-border/50 cursor-pointer h-full">
+        <CardContent className="p-4 h-full">
+          <div className="flex flex-col items-center space-y-3 text-center h-full">
+            {/* Service Icon - Bigger */}
+            <div className="relative w-20 h-20 flex-shrink-0">
+              <Image
+                src={service.iconPath}
+                alt={service.name}
+                fill
+                className="object-contain"
+              />
+            </div>
+
+            {/* Service Title - Consistent Height */}
+            <div className="flex flex-col justify-center flex-1 min-h-[3rem]">
+              <h3 className="font-semibold text-sm leading-tight text-center px-1 line-clamp-2">
+                {service.name}
+              </h3>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </Link>
+  );
+}
+
+interface CategoryCardProps {
+  category: ServicesByCategory;
+  onExpand: () => void;
+}
+
+function CategoryCard({ category, onExpand }: CategoryCardProps) {
+  return (
+    <Card
+      className="group hover:shadow-lg transition-all duration-300 hover:scale-[1.03] bg-card/60 backdrop-blur border-border/50 cursor-pointer h-full"
+      onClick={onExpand}
+    >
+      <CardContent className="p-6 h-full">
+        <div className="flex flex-col items-center text-center h-full">
+          {/* Category Icon - Large */}
+          <div className="relative w-24 h-24 flex-shrink-0 mb-4">
             <Image
-              src={service.iconPath}
-              alt={service.name}
+              src={category.iconPath}
+              alt={category.displayName}
               fill
               className="object-contain"
             />
           </div>
 
-          {/* Service Info */}
-          <div className="space-y-2 min-h-[80px] flex flex-col justify-between">
-            <div>
-              <h3 className="font-semibold text-sm leading-tight line-clamp-2">
-                {service.name}
-              </h3>
-              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                {service.summary}
-              </p>
-            </div>
+          {/* Category Title - Flexible */}
+          <div className="flex-1 flex items-center justify-center mb-4">
+            <h3 className="font-bold text-lg leading-tight text-center">
+              {category.displayName}
+            </h3>
           </div>
 
-          {/* Actions */}
-          <div className="flex items-center justify-center space-x-2 w-full">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onToggleFavorite(service.id)}
-              className="h-8 px-2"
-            >
-              <Heart
-                className={`h-4 w-4 ${
-                  favorites.includes(service.id)
-                    ? "fill-current text-red-500"
-                    : "text-muted-foreground hover:text-red-500"
-                }`}
-              />
-            </Button>
-            <Button variant="ghost" size="sm" asChild className="h-8 px-2">
-              <Link href={`/${service.category}/${service.slug}`}>
-                <ExternalLink className="h-4 w-4" />
-              </Link>
-            </Button>
+          {/* Service Count Badge - Snapped to Bottom */}
+          <div className="mt-auto">
+            <Badge variant="secondary" className="text-sm px-3 py-1">
+              {category.services.length} services
+            </Badge>
           </div>
         </div>
       </CardContent>
@@ -102,45 +111,60 @@ function ServiceCard({
 
 interface CategoryRowProps {
   category: ServicesByCategory;
-  favorites: string[];
-  onToggleFavorite: (serviceId: string) => void;
+  isExpanded: boolean;
+  onToggle: () => void;
+  categoryRef: React.RefObject<HTMLDivElement | null>;
 }
 
 function CategoryRow({
   category,
-  favorites,
-  onToggleFavorite,
+  isExpanded,
+  onToggle,
+  categoryRef,
 }: CategoryRowProps) {
   return (
-    <div className="space-y-4">
-      {/* Category Header */}
-      <div className="flex items-center space-x-3">
-        <div className="relative w-8 h-8 flex-shrink-0">
-          <Image
-            src={category.iconPath}
-            alt={category.displayName}
-            fill
-            className="object-contain"
-          />
-        </div>
+    <div ref={categoryRef} className="space-y-8">
+      {/* Category Header - Clickable */}
+      <div
+        className="flex items-center space-x-4 cursor-pointer hover:bg-accent/30 rounded-lg p-4 -m-4 transition-colors border-b border-border/30 pb-6"
+        onClick={onToggle}
+      >
         <div className="flex items-center space-x-3">
-          <h2 className="text-xl font-semibold">{category.displayName}</h2>
-          <Badge variant="secondary" className="text-xs">
+          {isExpanded ? (
+            <ChevronDown className="w-6 h-6 text-muted-foreground transition-transform duration-200" />
+          ) : (
+            <ChevronRight className="w-6 h-6 text-muted-foreground transition-transform duration-200" />
+          )}
+          <div className="relative w-12 h-12 flex-shrink-0">
+            <Image
+              src={category.iconPath}
+              alt={category.displayName}
+              fill
+              className="object-contain"
+            />
+          </div>
+        </div>
+        <div className="flex items-center space-x-4">
+          <h2 className="text-2xl font-semibold">{category.displayName}</h2>
+          <Badge variant="secondary" className="text-sm px-3 py-1">
             {category.services.length} services
           </Badge>
         </div>
       </div>
 
-      {/* Services Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4">
-        {category.services.map((service) => (
-          <ServiceCard
-            key={service.id}
-            service={service}
-            favorites={favorites}
-            onToggleFavorite={onToggleFavorite}
-          />
-        ))}
+      {/* Services Grid - Collapsible with proper spacing */}
+      <div
+        className={`transition-all duration-300 ease-in-out overflow-hidden ${
+          isExpanded ? "max-h-[2000px] opacity-100" : "max-h-0 opacity-0"
+        }`}
+      >
+        <div className="pt-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4">
+            {category.services.map((service) => (
+              <ServiceCard key={service.id} service={service} />
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -151,8 +175,17 @@ export function ServicesDashboard() {
   const [servicesByCategory, setServicesByCategory] = useState<
     ServicesByCategory[]
   >([]);
-  const [favorites, setFavorites] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
+    new Set()
+  );
+  const [layoutMode, setLayoutMode] = useState<"grid" | "list">("grid");
+  const [isTransitioning, setIsTransitioning] = useState(false);
+
+  // Create refs for each category for scrolling
+  const categoryRefs = useRef<{
+    [key: string]: React.RefObject<HTMLDivElement | null>;
+  }>({});
 
   // Fetch services from API
   useEffect(() => {
@@ -161,6 +194,14 @@ export function ServicesDashboard() {
         setLoading(true);
         const services = await fetchServices();
         setServicesByCategory(services);
+
+        // Initialize refs for each category
+        const refs: { [key: string]: React.RefObject<HTMLDivElement | null> } =
+          {};
+        services.forEach((category) => {
+          refs[category.category] = React.createRef<HTMLDivElement>();
+        });
+        categoryRefs.current = refs;
       } catch (error) {
         console.error("Failed to load services:", error);
         setServicesByCategory([]);
@@ -171,6 +212,52 @@ export function ServicesDashboard() {
 
     loadServices();
   }, []);
+
+  // Monitor expanded categories to switch layout modes
+  useEffect(() => {
+    const hasExpandedCategories = expandedCategories.size > 0;
+    const newMode = hasExpandedCategories ? "list" : "grid";
+
+    if (newMode !== layoutMode) {
+      setIsTransitioning(true);
+      setTimeout(() => {
+        setLayoutMode(newMode);
+        setIsTransitioning(false);
+      }, 150);
+    }
+  }, [expandedCategories, layoutMode]);
+
+  // Handle category expansion
+  const handleCategoryExpand = (categoryId: string) => {
+    const newExpanded = new Set(expandedCategories);
+
+    if (expandedCategories.has(categoryId)) {
+      newExpanded.delete(categoryId);
+    } else {
+      newExpanded.add(categoryId);
+
+      // Scroll to category after layout change with offset for navbar
+      setTimeout(() => {
+        const categoryRef = categoryRefs.current[categoryId];
+        if (categoryRef?.current) {
+          const element = categoryRef.current;
+          const elementPosition =
+            element.getBoundingClientRect().top + window.pageYOffset;
+          const navbarHeight = 64; // Approximate navbar height (h-16 = 64px)
+          const viewportOffset = window.innerHeight * 0.05; // 5% of viewport height
+          const offsetPosition =
+            elementPosition - navbarHeight - viewportOffset;
+
+          window.scrollTo({
+            top: offsetPosition,
+            behavior: "smooth",
+          });
+        }
+      }, 300);
+    }
+
+    setExpandedCategories(newExpanded);
+  };
 
   // Filter categories based on search term
   const filteredCategories = servicesByCategory
@@ -185,20 +272,6 @@ export function ServicesDashboard() {
     }))
     .filter((category) => category.services.length > 0)
     .sort((a, b) => a.displayName.localeCompare(b.displayName)); // Sort alphabetically
-
-  const toggleFavorite = (serviceId: string) => {
-    setFavorites((prev) =>
-      prev.includes(serviceId)
-        ? prev.filter((id) => id !== serviceId)
-        : [...prev, serviceId]
-    );
-  };
-
-  // Get favorite services for the favorites row (if user has favorites)
-  const allServices = servicesByCategory.flatMap((cat) => cat.services);
-  const favoriteServices = allServices.filter((service) =>
-    favorites.includes(service.id)
-  );
 
   if (loading) {
     return (
@@ -237,41 +310,37 @@ export function ServicesDashboard() {
           </div>
         </div>
 
-        {/* Favorites Row (Only show if user has favorites) */}
-        {favoriteServices.length > 0 && (
-          <div className="space-y-4">
-            <div className="flex items-center space-x-3">
-              <Heart className="w-8 h-8 text-red-500 fill-current" />
-              <div className="flex items-center space-x-3">
-                <h2 className="text-xl font-semibold">Your Favorites</h2>
-                <Badge variant="secondary" className="text-xs">
-                  {favoriteServices.length} services
-                </Badge>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4">
-              {favoriteServices.map((service) => (
-                <ServiceCard
-                  key={service.id}
-                  service={service}
-                  favorites={favorites}
-                  onToggleFavorite={toggleFavorite}
+        {/* Dynamic Layout Container */}
+        <div
+          className={`transition-opacity duration-300 ${
+            isTransitioning ? "opacity-50" : "opacity-100"
+          }`}
+        >
+          {layoutMode === "grid" ? (
+            /* Phase 1: Category Cards Grid */
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-6">
+              {filteredCategories.map((category) => (
+                <CategoryCard
+                  key={category.category}
+                  category={category}
+                  onExpand={() => handleCategoryExpand(category.category)}
                 />
               ))}
             </div>
-          </div>
-        )}
-
-        {/* Category Rows */}
-        <div className="space-y-12">
-          {filteredCategories.map((category) => (
-            <CategoryRow
-              key={category.category}
-              category={category}
-              favorites={favorites}
-              onToggleFavorite={toggleFavorite}
-            />
-          ))}
+          ) : (
+            /* Phase 2: Category Rows List */
+            <div className="space-y-16">
+              {filteredCategories.map((category) => (
+                <CategoryRow
+                  key={category.category}
+                  category={category}
+                  isExpanded={expandedCategories.has(category.category)}
+                  onToggle={() => handleCategoryExpand(category.category)}
+                  categoryRef={categoryRefs.current[category.category]}
+                />
+              ))}
+            </div>
+          )}
         </div>
 
         {/* No Results */}

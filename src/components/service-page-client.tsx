@@ -120,7 +120,7 @@ export function ServicePageClient({
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/5">
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
+      <div className="container mx-auto px-4 py-8">
         {/* Header Navigation */}
         <div className="flex items-center gap-4 mb-8">
           <Button variant="ghost" asChild className="gap-2">
@@ -161,12 +161,12 @@ export function ServicePageClient({
         <div className="mb-8">
           <div className="flex items-start gap-6 mb-6">
             {/* Service Icon */}
-            <div className="relative w-24 h-24 flex-shrink-0 bg-white rounded-lg p-4 border shadow-sm">
+            <div className="relative w-24 h-24 flex-shrink-0">
               <Image
                 src={service.iconPath}
                 alt={service.name}
                 fill
-                className="object-contain p-2"
+                className="object-contain"
               />
             </div>
 
@@ -328,6 +328,67 @@ export function ServicePageClient({
             </CardContent>
           </Card>
 
+          {/* Architecture Diagrams Card */}
+          <Card className="border-l-4 border-l-amber-500 bg-card/50 backdrop-blur">
+            <CardHeader>
+              <CardTitle className="text-xl flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-amber-500/10 flex items-center justify-center">
+                  <span className="text-amber-500 font-semibold text-sm">
+                    📊
+                  </span>
+                </div>
+                Architecture Diagrams
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isEditing ? (
+                <div className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Interactive diagrams will be available here. Possible
+                    integrations:
+                  </p>
+                  <div className="grid gap-2 text-sm">
+                    <div className="p-3 bg-muted/50 rounded-lg">
+                      <strong>Draw.io Integration:</strong> Embed interactive
+                      diagrams via iframe or API
+                    </div>
+                    <div className="p-3 bg-muted/50 rounded-lg">
+                      <strong>Lucidchart:</strong> Professional diagramming with
+                      collaboration features
+                    </div>
+                    <div className="p-3 bg-muted/50 rounded-lg">
+                      <strong>Mermaid.js:</strong> Code-based diagrams rendered
+                      client-side
+                    </div>
+                    <div className="p-3 bg-muted/50 rounded-lg">
+                      <strong>Custom SVG:</strong> Static architecture diagrams
+                      as scalable vector graphics
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-amber-500/10 flex items-center justify-center">
+                    <span className="text-2xl">📊</span>
+                  </div>
+                  <h3 className="font-semibold mb-2">
+                    Interactive Architecture Diagrams
+                  </h3>
+                  <p className="text-muted-foreground text-sm mb-4">
+                    Visual representations of {service.name} architecture and
+                    data flows will be available here.
+                  </p>
+                  <div className="text-xs text-muted-foreground">
+                    <p>
+                      <strong>Possible integrations:</strong> Draw.io,
+                      Lucidchart, Mermaid.js, or custom SVG diagrams
+                    </p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {/* HTML Content Card */}
           <Card className="border-l-4 border-l-blue-500 bg-card/50 backdrop-blur">
             <CardHeader>
@@ -362,79 +423,6 @@ export function ServicePageClient({
                   }}
                 />
               )}
-            </CardContent>
-          </Card>
-
-          {/* Service Information Card */}
-          <Card className="border-l-4 border-l-green-500 bg-card/50 backdrop-blur">
-            <CardHeader>
-              <CardTitle className="text-xl flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center">
-                  <span className="text-green-500 font-semibold text-sm">
-                    ℹ️
-                  </span>
-                </div>
-                Service Details
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <h4 className="font-semibold mb-2 text-foreground">
-                    Category
-                  </h4>
-                  <div className="flex items-center gap-2">
-                    <div className="relative w-5 h-5">
-                      <Image
-                        src={categoryInfo.iconPath}
-                        alt={categoryInfo.displayName}
-                        fill
-                        className="object-contain"
-                      />
-                    </div>
-                    <span className="text-muted-foreground">
-                      {categoryInfo.displayName}
-                    </span>
-                  </div>
-                </div>
-                <div>
-                  <h4 className="font-semibold mb-2 text-foreground">
-                    Service ID
-                  </h4>
-                  <code className="text-sm bg-muted px-2 py-1 rounded text-muted-foreground">
-                    {service.id}
-                  </code>
-                </div>
-                <div>
-                  <h4 className="font-semibold mb-2 text-foreground">
-                    Last Updated
-                  </h4>
-                  <span className="text-muted-foreground">
-                    {new Date(service.updatedAt).toLocaleDateString()}
-                  </span>
-                </div>
-                <div>
-                  <h4 className="font-semibold mb-2 text-foreground">Status</h4>
-                  {isEditing ? (
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id="service-enabled"
-                        checked={editData.enabled}
-                        onCheckedChange={(checked) =>
-                          setEditData((prev) => ({ ...prev, enabled: checked }))
-                        }
-                      />
-                      <Label htmlFor="service-enabled">
-                        {editData.enabled ? "Enabled" : "Disabled"}
-                      </Label>
-                    </div>
-                  ) : (
-                    <Badge variant={service.enabled ? "default" : "secondary"}>
-                      {service.enabled ? "Active" : "Disabled"}
-                    </Badge>
-                  )}
-                </div>
-              </div>
             </CardContent>
           </Card>
 

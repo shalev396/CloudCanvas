@@ -16,6 +16,7 @@ import { LoginDialog } from "@/components/login-dialog";
 import { CLOUD_PROVIDERS } from "@/lib/categories";
 import { ChevronDown, Cloud, LogIn, LogOut, User, Shield } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
+import Image from "next/image";
 
 export function Navbar() {
   const [selectedProvider, setSelectedProvider] = useState("aws");
@@ -59,20 +60,37 @@ export function Navbar() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="gap-2">
-                <div className="w-6 h-6 bg-muted rounded flex items-center justify-center">
-                  <span className="text-xs font-bold">
-                    {currentProvider?.displayName
-                      .split(" ")
-                      .map((word) => word[0])
-                      .join("")}
-                  </span>
-                </div>
-                <span>{currentProvider?.displayName}</span>
-                {currentProvider?.enabled && (
-                  <Badge variant="default" className="text-xs px-1.5 py-0">
-                    Active
-                  </Badge>
+                {currentProvider?.iconPath ? (
+                  <div className="w-6 h-6 relative flex-shrink-0">
+                    <Image
+                      src={currentProvider.iconPath}
+                      alt={currentProvider.displayName}
+                      width={24}
+                      height={24}
+                      className="object-contain dark:hidden"
+                    />
+                    <Image
+                      src={currentProvider.iconPath.replace(
+                        ".svg",
+                        "_Dark.svg"
+                      )}
+                      alt={currentProvider.displayName}
+                      width={24}
+                      height={24}
+                      className="object-contain hidden dark:block"
+                    />
+                  </div>
+                ) : (
+                  <div className="w-6 h-6 bg-muted rounded flex items-center justify-center">
+                    <span className="text-xs font-bold">
+                      {currentProvider?.displayName
+                        .split(" ")
+                        .map((word) => word[0])
+                        .join("")}
+                    </span>
+                  </div>
                 )}
+                <span>{currentProvider?.displayName}</span>
                 <ChevronDown className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -88,23 +106,40 @@ export function Navbar() {
                 >
                   <div className="flex items-center justify-between w-full">
                     <div className="flex items-center space-x-2">
-                      <div className="w-5 h-5 bg-muted rounded flex items-center justify-center">
-                        <span className="text-xs font-bold">
-                          {provider.displayName
-                            .split(" ")
-                            .map((word) => word[0])
-                            .join("")}
-                        </span>
-                      </div>
+                      {provider.iconPath ? (
+                        <div className="w-5 h-5 relative flex-shrink-0">
+                          <Image
+                            src={provider.iconPath}
+                            alt={provider.displayName}
+                            width={20}
+                            height={20}
+                            className="object-contain dark:hidden"
+                          />
+                          <Image
+                            src={provider.iconPath.replace(".svg", "_Dark.svg")}
+                            alt={provider.displayName}
+                            width={20}
+                            height={20}
+                            className="object-contain hidden dark:block"
+                            onError={(e) => {
+                              // Fallback to light version if dark doesn't exist
+                              e.currentTarget.src = provider.iconPath || "";
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="w-5 h-5 bg-muted rounded flex items-center justify-center">
+                          <span className="text-xs font-bold">
+                            {provider.displayName
+                              .split(" ")
+                              .map((word) => word[0])
+                              .join("")}
+                          </span>
+                        </div>
+                      )}
                       <span>{provider.displayName}</span>
                     </div>
-                    {provider.enabled ? (
-                      selectedProvider === provider.id && (
-                        <Badge variant="default" className="text-xs">
-                          Active
-                        </Badge>
-                      )
-                    ) : (
+                    {!provider.enabled && (
                       <Badge variant="outline" className="text-xs">
                         Soon
                       </Badge>
