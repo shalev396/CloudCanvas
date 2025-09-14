@@ -59,9 +59,9 @@ export function Navbar() {
         <div className="flex-1 flex items-center justify-center">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="gap-2">
+              <Button variant="outline" className="gap-1 sm:gap-2">
                 {currentProvider?.iconPath ? (
-                  <div className="w-6 h-6 relative flex-shrink-0">
+                  <div className="w-5 h-5 sm:w-6 sm:h-6 relative flex-shrink-0">
                     <Image
                       src={currentProvider.iconPath}
                       alt={currentProvider.displayName}
@@ -81,7 +81,7 @@ export function Navbar() {
                     />
                   </div>
                 ) : (
-                  <div className="w-6 h-6 bg-muted rounded flex items-center justify-center">
+                  <div className="w-5 h-5 sm:w-6 sm:h-6 bg-muted rounded flex items-center justify-center">
                     <span className="text-xs font-bold">
                       {currentProvider?.displayName
                         .split(" ")
@@ -90,11 +90,10 @@ export function Navbar() {
                     </span>
                   </div>
                 )}
-                <span>{currentProvider?.displayName}</span>
-                <ChevronDown className="h-4 w-4" />
+                <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuContent align="end" className="w-auto min-w-[120px]">
               {CLOUD_PROVIDERS.map((provider) => (
                 <DropdownMenuItem
                   key={provider.id}
@@ -102,43 +101,40 @@ export function Navbar() {
                   onClick={() =>
                     provider.enabled && setSelectedProvider(provider.id)
                   }
-                  className="cursor-pointer"
+                  className="cursor-pointer flex items-center justify-center p-3"
                 >
-                  <div className="flex items-center justify-between w-full">
-                    <div className="flex items-center space-x-2">
-                      {provider.iconPath ? (
-                        <div className="w-5 h-5 relative flex-shrink-0">
-                          <Image
-                            src={provider.iconPath}
-                            alt={provider.displayName}
-                            width={20}
-                            height={20}
-                            className="object-contain dark:hidden"
-                          />
-                          <Image
-                            src={provider.iconPath.replace(".svg", "_Dark.svg")}
-                            alt={provider.displayName}
-                            width={20}
-                            height={20}
-                            className="object-contain hidden dark:block"
-                            onError={(e) => {
-                              // Fallback to light version if dark doesn't exist
-                              e.currentTarget.src = provider.iconPath || "";
-                            }}
-                          />
-                        </div>
-                      ) : (
-                        <div className="w-5 h-5 bg-muted rounded flex items-center justify-center">
-                          <span className="text-xs font-bold">
-                            {provider.displayName
-                              .split(" ")
-                              .map((word) => word[0])
-                              .join("")}
-                          </span>
-                        </div>
-                      )}
-                      <span>{provider.displayName}</span>
-                    </div>
+                  <div className="flex flex-col items-center gap-1">
+                    {provider.iconPath ? (
+                      <div className="w-6 h-6 relative flex-shrink-0">
+                        <Image
+                          src={provider.iconPath}
+                          alt={provider.displayName}
+                          width={24}
+                          height={24}
+                          className="object-contain dark:hidden"
+                        />
+                        <Image
+                          src={provider.iconPath.replace(".svg", "_Dark.svg")}
+                          alt={provider.displayName}
+                          width={24}
+                          height={24}
+                          className="object-contain hidden dark:block"
+                          onError={(e) => {
+                            // Fallback to light version if dark doesn't exist
+                            e.currentTarget.src = provider.iconPath || "";
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-6 h-6 bg-muted rounded flex items-center justify-center">
+                        <span className="text-xs font-bold">
+                          {provider.displayName
+                            .split(" ")
+                            .map((word) => word[0])
+                            .join("")}
+                        </span>
+                      </div>
+                    )}
                     {!provider.enabled && (
                       <Badge variant="outline" className="text-xs">
                         Soon

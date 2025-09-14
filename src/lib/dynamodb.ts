@@ -94,10 +94,21 @@ export class ServicesDb {
         ExpressionAttributeValues: {
           ":category": category,
         },
+        ProjectionExpression:
+          "id, #name, slug, category, summary, description, htmlContent, awsDocsUrl, diagramUrl, iconPath, enabled, createdAt, updatedAt",
+        ExpressionAttributeNames: {
+          "#name": "name", // 'name' is a reserved word in DynamoDB
+        },
       })
     );
 
-    return (result.Items as AwsService[]) || [];
+    const services = (result.Items as AwsService[]) || [];
+
+    // Ensure enabled field has a default value for consistency
+    return services.map((service) => ({
+      ...service,
+      enabled: service.enabled ?? true,
+    }));
   }
 
   static async getServicesByIds(ids: string[]): Promise<AwsService[]> {
@@ -183,18 +194,20 @@ export class ServicesDb {
       new ScanCommand({
         TableName: TABLES.SERVICES,
         ProjectionExpression:
-          "id, #name, slug, category, summary, iconPath, enabled",
-        FilterExpression: "enabled = :enabled OR attribute_not_exists(enabled)", //TODO: fix
+          "id, #name, slug, category, summary, iconPath, enabled, htmlContent, awsDocsUrl, diagramUrl",
         ExpressionAttributeNames: {
           "#name": "name", // 'name' is a reserved word in DynamoDB
-        },
-        ExpressionAttributeValues: {
-          ":enabled": true,
         },
       })
     );
 
-    return (result.Items as Partial<AwsService>[]) || [];
+    const services = (result.Items as Partial<AwsService>[]) || [];
+
+    // Ensure enabled field has a default value for consistency
+    return services.map((service) => ({
+      ...service,
+      enabled: service.enabled ?? true,
+    }));
   }
 
   // Get all services for admin (including disabled ones)
@@ -203,14 +216,20 @@ export class ServicesDb {
       new ScanCommand({
         TableName: TABLES.SERVICES,
         ProjectionExpression:
-          "id, #name, slug, category, summary, iconPath, enabled",
+          "id, #name, slug, category, summary, iconPath, enabled, htmlContent, awsDocsUrl, diagramUrl",
         ExpressionAttributeNames: {
           "#name": "name", // 'name' is a reserved word in DynamoDB
         },
       })
     );
 
-    return (result.Items as Partial<AwsService>[]) || [];
+    const services = (result.Items as Partial<AwsService>[]) || [];
+
+    // Ensure enabled field has a default value for consistency
+    return services.map((service) => ({
+      ...service,
+      enabled: service.enabled ?? true,
+    }));
   }
 }
 

@@ -4,10 +4,10 @@ import React, { useState, useEffect, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { ServiceCard } from "@/components/service-card";
 import { Search, ChevronDown, ChevronRight } from "lucide-react";
 import Image from "next/image";
-import Link from "next/link";
-import { AwsService, ServicesByCategory } from "@/lib/types";
+import { ServicesByCategory } from "@/lib/types";
 
 // Fetch services from API
 async function fetchServices(): Promise<ServicesByCategory[]> {
@@ -34,72 +34,57 @@ async function fetchServices(): Promise<ServicesByCategory[]> {
   }
 }
 
-interface ServiceCardProps {
-  service: AwsService;
-}
-
-function ServiceCard({ service }: ServiceCardProps) {
-  return (
-    <Link href={`/${service.category}/${service.slug}`} className="block">
-      <Card className="group hover:shadow-lg transition-all duration-300 hover:scale-[1.03] bg-card/60 backdrop-blur border-border/50 cursor-pointer h-full">
-        <CardContent className="p-4 h-full">
-          <div className="flex flex-col items-center space-y-3 text-center h-full">
-            {/* Service Icon - Bigger */}
-            <div className="relative w-20 h-20 flex-shrink-0">
-              <Image
-                src={service.iconPath}
-                alt={service.name}
-                fill
-                className="object-contain"
-              />
-            </div>
-
-            {/* Service Title - Consistent Height */}
-            <div className="flex flex-col justify-center flex-1 min-h-[3rem]">
-              <h3 className="font-semibold text-sm leading-tight text-center px-1 line-clamp-2">
-                {service.name}
-              </h3>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </Link>
-  );
-}
-
 interface CategoryCardProps {
   category: ServicesByCategory;
   onExpand: () => void;
 }
 
 function CategoryCard({ category, onExpand }: CategoryCardProps) {
+  // Skip rendering if category is invalid or has no services
+  if (
+    !category ||
+    !category.displayName ||
+    !category.iconPath ||
+    category.services.length === 0
+  ) {
+    return null;
+  }
+
   return (
     <Card
       className="group hover:shadow-lg transition-all duration-300 hover:scale-[1.03] bg-card/60 backdrop-blur border-border/50 cursor-pointer h-full"
       onClick={onExpand}
     >
-      <CardContent className="p-6 h-full">
+      <CardContent className="p-3 sm:p-6 h-full">
         <div className="flex flex-col items-center text-center h-full">
-          {/* Category Icon - Large */}
-          <div className="relative w-24 h-24 flex-shrink-0 mb-4">
+          {/* Category Icon - Responsive */}
+          <div className="relative w-12 h-12 sm:w-24 sm:h-24 flex-shrink-0 mb-2 sm:mb-4">
             <Image
               src={category.iconPath}
               alt={category.displayName}
               fill
               className="object-contain"
+              onError={(e) => {
+                // Fallback for broken images
+                e.currentTarget.src =
+                  "/aws/Category/Arch-Category_Compute_64.svg";
+              }}
             />
           </div>
 
-          {/* Category Title - Flexible */}
-          <div className="flex-1 flex items-center justify-center mb-4">
-            <h3 className="font-bold text-lg leading-tight text-center">
+          {/* Category Title - Responsive */}
+          <div className="flex-1 flex items-center justify-center mb-2 sm:mb-4">
+            <h3 className="font-bold text-sm sm:text-lg leading-tight text-center">
               {category.displayName}
             </h3>
           </div>
 
-          {/* Service Count Badge - Snapped to Bottom */}
+          {/* Service Count Badge - Responsive */}
           <div className="mt-auto">
-            <Badge variant="secondary" className="text-sm px-3 py-1">
+            <Badge
+              variant="secondary"
+              className="text-xs sm:text-sm px-2 sm:px-3 py-1"
+            >
               {category.services.length} services
             </Badge>
           </div>
@@ -144,9 +129,14 @@ function CategoryRow({
             />
           </div>
         </div>
-        <div className="flex items-center space-x-4">
-          <h2 className="text-2xl font-semibold">{category.displayName}</h2>
-          <Badge variant="secondary" className="text-sm px-3 py-1">
+        <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-4 flex-1">
+          <h2 className="text-xl sm:text-2xl font-semibold">
+            {category.displayName}
+          </h2>
+          <Badge
+            variant="secondary"
+            className="text-xs sm:text-sm px-2 py-1 sm:px-3 w-fit"
+          >
             {category.services.length} services
           </Badge>
         </div>
@@ -155,13 +145,22 @@ function CategoryRow({
       {/* Services Grid - Collapsible with proper spacing */}
       <div
         className={`transition-all duration-300 ease-in-out overflow-hidden ${
-          isExpanded ? "max-h-[2000px] opacity-100" : "max-h-0 opacity-0"
+          isExpanded ? "max-h-none opacity-100" : "max-h-0 opacity-0"
         }`}
       >
         <div className="pt-4">
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4">
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-9 gap-2 sm:gap-3">
             {category.services.map((service) => (
-              <ServiceCard key={service.id} service={service} />
+              <React.Fragment key={service.id}>
+                {/* Mobile: Small size (33% smaller than medium) */}
+                <div className="sm:hidden">
+                  <ServiceCard service={service} size="small" />
+                </div>
+                {/* Desktop: Medium size */}
+                <div className="hidden sm:block">
+                  <ServiceCard service={service} size="medium" />
+                </div>
+              </React.Fragment>
             ))}
           </div>
         </div>
@@ -318,14 +317,21 @@ export function ServicesDashboard() {
         >
           {layoutMode === "grid" ? (
             /* Phase 1: Category Cards Grid */
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-6">
-              {filteredCategories.map((category) => (
-                <CategoryCard
-                  key={category.category}
-                  category={category}
-                  onExpand={() => handleCategoryExpand(category.category)}
-                />
-              ))}
+            <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-3 sm:gap-6">
+              {filteredCategories
+                .filter(
+                  (category) =>
+                    category &&
+                    category.services &&
+                    category.services.length > 0
+                )
+                .map((category) => (
+                  <CategoryCard
+                    key={category.category}
+                    category={category}
+                    onExpand={() => handleCategoryExpand(category.category)}
+                  />
+                ))}
             </div>
           ) : (
             /* Phase 2: Category Rows List */

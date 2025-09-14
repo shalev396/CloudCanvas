@@ -4,30 +4,30 @@ import { requireAdmin, createUnauthorizedResponse } from "@/lib/middleware";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ slug: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { slug } = await params;
+    const { id } = await params;
 
-    if (!slug) {
+    if (!id) {
       return NextResponse.json(
-        { success: false, error: "Service slug is required" },
+        { success: false, error: "Service ID is required" },
         { status: 400 }
       );
     }
 
-    const service = await ServicesDb.getServiceBySlug(slug);
+    const service = await ServicesDb.getService(id);
 
     if (!service) {
       return NextResponse.json(
-        { success: false, error: "Service not found" },
+        { success: false, error: `Service not found with ID: ${id}` },
         { status: 404 }
       );
     }
 
     return NextResponse.json({ success: true, data: service });
   } catch (error) {
-    console.error("Error fetching service:", error);
+    console.error("Error fetching service by ID:", error);
     return NextResponse.json(
       { success: false, error: "Failed to fetch service" },
       { status: 500 }
@@ -37,7 +37,7 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ slug: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Check if user is admin
@@ -46,33 +46,33 @@ export async function PUT(
       return createUnauthorizedResponse(authResult.error);
     }
 
-    const { slug } = await params;
+    const { id } = await params;
     const updates = await request.json();
 
-    if (!slug) {
+    if (!id) {
       return NextResponse.json(
-        { success: false, error: "Service slug is required" },
+        { success: false, error: "Service ID is required" },
         { status: 400 }
       );
     }
 
-    // First get the service to find its ID
-    const service = await ServicesDb.getServiceBySlug(slug);
-    if (!service) {
+    // Verify service exists
+    const existingService = await ServicesDb.getService(id);
+    if (!existingService) {
       return NextResponse.json(
-        { success: false, error: `Service not found with slug: ${slug}` },
+        { success: false, error: `Service not found with ID: ${id}` },
         { status: 404 }
       );
     }
 
     // Update the service
-    await ServicesDb.updateService(service.id, updates);
+    await ServicesDb.updateService(id, updates);
 
     // Return updated service
-    const updatedService = await ServicesDb.getService(service.id);
+    const updatedService = await ServicesDb.getService(id);
     return NextResponse.json({ success: true, data: updatedService });
   } catch (error) {
-    console.error("Error updating service:", error);
+    console.error("Error updating service by ID:", error);
     return NextResponse.json(
       { success: false, error: "Failed to update service" },
       { status: 500 }

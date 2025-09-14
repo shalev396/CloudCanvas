@@ -1,7 +1,8 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@plugin "./typography.ts";
 
-@@custom-variant dark (&:is(.dark *));
+@custom-variant dark (&:is(.dark *));
 
 :root {
   /* Updated color tokens to match AWS study website design brief */
