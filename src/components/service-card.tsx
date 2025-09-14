@@ -7,6 +7,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { AwsService } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/auth-context";
 
 interface ServiceCardProps {
   service: AwsService;
@@ -21,7 +22,12 @@ const ServiceCardComponent = ({
   showCategory = false,
   className,
 }: ServiceCardProps) => {
+  const { user, isAuthenticated } = useAuth();
+  const isAdmin = isAuthenticated && user?.isAdmin;
   const isDisabled = !(service.enabled ?? true); // Default to enabled if null/undefined
+
+  // Admin can override disabled state for clicking
+  const canClick = !isDisabled || isAdmin;
 
   const sizeConfig = {
     mobile: {
@@ -68,8 +74,9 @@ const ServiceCardComponent = ({
       className={cn(
         "group transition-all duration-300 bg-card/60 backdrop-blur border-border/50",
         config.fixedHeight,
-        !isDisabled && "hover:shadow-lg hover:scale-[1.03] cursor-pointer",
-        isDisabled && "opacity-50 cursor-not-allowed bg-muted/30",
+        canClick && "hover:shadow-lg hover:scale-[1.03] cursor-pointer",
+        isDisabled && !canClick && "opacity-50 cursor-not-allowed bg-muted/30",
+        isDisabled && canClick && "opacity-70 bg-muted/20", // Slightly less disabled look for admin
         className
       )}
     >
@@ -129,12 +136,12 @@ const ServiceCardComponent = ({
     </Card>
   );
 
-  // If disabled, return the card without Link wrapper
-  if (isDisabled) {
+  // If not clickable (disabled and not admin), return the card without Link wrapper
+  if (!canClick) {
     return <ServiceCardContent />;
   }
 
-  // If enabled, wrap with Link
+  // If clickable (enabled or admin override), wrap with Link
   return (
     <Link href={`/${service.category}/${service.slug}`} className="block">
       <ServiceCardContent />

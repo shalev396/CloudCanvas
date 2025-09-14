@@ -40,7 +40,22 @@ async function getServiceData(
       const service = result.data.find(
         (s: AwsService) => s.slug === serviceSlug
       );
-      return service || null;
+
+      // Ensure all string fields have safe defaults
+      if (service) {
+        return {
+          ...service,
+          enabled: service.enabled ?? true,
+          htmlContent: service.htmlContent || "",
+          awsDocsUrl: service.awsDocsUrl || "",
+          diagramUrl: service.diagramUrl || "",
+          summary: service.summary || "",
+          description: service.description || "",
+          name: service.name || "Unknown Service",
+        };
+      }
+
+      return null;
     }
 
     return null;

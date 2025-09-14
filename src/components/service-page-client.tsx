@@ -46,13 +46,13 @@ export function ServicePageClient({
   const [relatedServices, setRelatedServices] = useState<AwsService[]>([]);
   const [loadingRelated, setLoadingRelated] = useState(true);
   const [editData, setEditData] = useState({
-    name: service.name,
-    summary: service.summary,
-    description: service.description,
+    name: service.name || "",
+    summary: service.summary || "",
+    description: service.description || "",
     htmlContent: service.htmlContent || "",
     awsDocsUrl: service.awsDocsUrl || "",
     diagramUrl: service.diagramUrl || "",
-    enabled: service.enabled,
+    enabled: service.enabled ?? true,
   });
   const [saveMessage, setSaveMessage] = useState<{
     type: "success" | "error";
@@ -62,8 +62,8 @@ export function ServicePageClient({
   const isAdmin = isAuthenticated && user?.isAdmin;
 
   // Convert markdown to HTML for rendering
-  const renderMarkdown = (markdown: string) => {
-    if (!markdown.trim()) return "";
+  const renderMarkdown = (markdown: string | null | undefined) => {
+    if (!markdown || !markdown.trim()) return "";
     try {
       // In marked v16+, use marked.parse() with options
       return marked.parse(markdown, {
@@ -155,13 +155,13 @@ export function ServicePageClient({
   const handleEdit = () => {
     setIsEditing(true);
     setEditData({
-      name: service.name,
-      summary: service.summary,
-      description: service.description,
+      name: service.name || "",
+      summary: service.summary || "",
+      description: service.description || "",
       htmlContent: service.htmlContent || "",
       awsDocsUrl: service.awsDocsUrl || "",
       diagramUrl: service.diagramUrl || "",
-      enabled: service.enabled,
+      enabled: service.enabled ?? true,
     });
     setSaveMessage(null);
   };
@@ -169,13 +169,13 @@ export function ServicePageClient({
   const handleCancel = () => {
     setIsEditing(false);
     setEditData({
-      name: service.name,
-      summary: service.summary,
-      description: service.description,
+      name: service.name || "",
+      summary: service.summary || "",
+      description: service.description || "",
       htmlContent: service.htmlContent || "",
       awsDocsUrl: service.awsDocsUrl || "",
       diagramUrl: service.diagramUrl || "",
-      enabled: service.enabled,
+      enabled: service.enabled ?? true,
     });
     setSaveMessage(null);
   };

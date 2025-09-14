@@ -9,9 +9,9 @@
     "lint": "eslint",
     "deploy:db:dev": "serverless deploy --stage dev",
     "deploy:db:prod": "serverless deploy --stage prod",
-    "generate:services": "powershell -ExecutionPolicy Bypass -File scripts/generate-services-data.ps1",
-    "seed:dev": "node scripts/seed-db.js dev ",
-    "seed:prod": "node scripts/seed-db.js prod"
+    "generate:services": "npx tsx scripts/generate-services-data.ts",
+    "seed:dev": "npx tsx scripts/seed-db.ts dev",
+    "seed:prod": "npx tsx scripts/seed-db.ts prod"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.887.0",
@@ -81,6 +81,7 @@
     "eslint": "^9",
     "eslint-config-next": "15.5.3",
     "tailwindcss": "^4",
+    "tsx": "^4.19.2",
     "tw-animate-css": "^1.3.8",
     "typescript": "^5"
   }

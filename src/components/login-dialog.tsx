@@ -113,7 +113,7 @@ export function LoginDialog({ open, onOpenChange }: LoginDialogProps) {
               />
             </div>
 
-            <div className="text-sm text-muted-foreground">
+            {/* <div className="text-sm text-muted-foreground">
               <p>Demo credentials:</p>
               <p>
                 <strong>Admin:</strong> admin@cloudcanvas.dev / admin123
@@ -121,7 +121,7 @@ export function LoginDialog({ open, onOpenChange }: LoginDialogProps) {
               <p>
                 <strong>User:</strong> test@cloudcanvas.dev / test123
               </p>
-            </div>
+            </div> */}
           </div>
 
           <DialogFooter>
