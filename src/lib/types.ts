@@ -6,7 +6,7 @@ export interface AwsService {
   category: string; // Category name
   summary: string; // Short description
   description: string; // Detailed description
-  htmlContent: string; // Rich HTML content for the service page
+  markdownContent: string; // Rich markdown content for the service page
   awsDocsUrl: string; // AWS documentation URL
   diagramUrl: string; // Draw.io diagram URL
   iconPath: string; // Path to SVG icon

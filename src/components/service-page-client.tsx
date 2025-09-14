@@ -49,7 +49,7 @@ export function ServicePageClient({
     name: service.name || "",
     summary: service.summary || "",
     description: service.description || "",
-    htmlContent: service.htmlContent || "",
+    markdownContent: service.markdownContent || "",
     awsDocsUrl: service.awsDocsUrl || "",
     diagramUrl: service.diagramUrl || "",
     enabled: service.enabled ?? true,
@@ -158,7 +158,7 @@ export function ServicePageClient({
       name: service.name || "",
       summary: service.summary || "",
       description: service.description || "",
-      htmlContent: service.htmlContent || "",
+      markdownContent: service.markdownContent || "",
       awsDocsUrl: service.awsDocsUrl || "",
       diagramUrl: service.diagramUrl || "",
       enabled: service.enabled ?? true,
@@ -172,7 +172,7 @@ export function ServicePageClient({
       name: service.name || "",
       summary: service.summary || "",
       description: service.description || "",
-      htmlContent: service.htmlContent || "",
+      markdownContent: service.markdownContent || "",
       awsDocsUrl: service.awsDocsUrl || "",
       diagramUrl: service.diagramUrl || "",
       enabled: service.enabled ?? true,
@@ -793,9 +793,12 @@ export function ServicePageClient({
               {isEditing ? (
                 <div className="p-6">
                   <RichTextEditor
-                    value={editData.htmlContent}
+                    value={editData.markdownContent}
                     onChange={(value) =>
-                      setEditData((prev) => ({ ...prev, htmlContent: value }))
+                      setEditData((prev) => ({
+                        ...prev,
+                        markdownContent: value,
+                      }))
                     }
                     placeholder="Enter detailed notes with markdown formatting..."
                   />
@@ -812,7 +815,7 @@ export function ServicePageClient({
                     className="prose prose-slate dark:prose-invert max-w-none lg:prose-lg"
                     dangerouslySetInnerHTML={{
                       __html:
-                        renderMarkdown(service.htmlContent) ||
+                        renderMarkdown(service.markdownContent) ||
                         "<p class='text-muted-foreground'>No additional notes available.</p>",
                     }}
                   />

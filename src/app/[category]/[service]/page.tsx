@@ -46,7 +46,7 @@ async function getServiceData(
         return {
           ...service,
           enabled: service.enabled ?? true,
-          htmlContent: service.htmlContent || "",
+          markdownContent: service.markdownContent || "",
           awsDocsUrl: service.awsDocsUrl || "",
           diagramUrl: service.diagramUrl || "",
           summary: service.summary || "",
@@ -72,9 +72,12 @@ async function getServiceData(
         return {
           ...service,
           enabled: service.enabled ?? true,
-          htmlContent: service.htmlContent || "",
+          markdownContent: service.markdownContent || "",
           awsDocsUrl: service.awsDocsUrl || "",
           diagramUrl: service.diagramUrl || "",
+          summary: service.summary || "",
+          description: service.description || "",
+          name: service.name || "Unknown Service",
         };
       }
 

@@ -95,7 +95,7 @@ export class ServicesDb {
           ":category": category,
         },
         ProjectionExpression:
-          "id, #name, slug, category, summary, description, htmlContent, awsDocsUrl, diagramUrl, iconPath, enabled, createdAt, updatedAt",
+          "id, #name, slug, category, summary, description, markdownContent, awsDocsUrl, diagramUrl, iconPath, enabled, createdAt, updatedAt",
         ExpressionAttributeNames: {
           "#name": "name", // 'name' is a reserved word in DynamoDB
         },
@@ -194,7 +194,7 @@ export class ServicesDb {
       new ScanCommand({
         TableName: TABLES.SERVICES,
         ProjectionExpression:
-          "id, #name, slug, category, summary, iconPath, enabled, htmlContent, awsDocsUrl, diagramUrl",
+          "id, #name, slug, category, summary, iconPath, enabled, markdownContent, awsDocsUrl, diagramUrl",
         ExpressionAttributeNames: {
           "#name": "name", // 'name' is a reserved word in DynamoDB
         },
@@ -216,7 +216,7 @@ export class ServicesDb {
       new ScanCommand({
         TableName: TABLES.SERVICES,
         ProjectionExpression:
-          "id, #name, slug, category, summary, iconPath, enabled, htmlContent, awsDocsUrl, diagramUrl",
+          "id, #name, slug, category, summary, iconPath, enabled, markdownContent, awsDocsUrl, diagramUrl",
         ExpressionAttributeNames: {
           "#name": "name", // 'name' is a reserved word in DynamoDB
         },

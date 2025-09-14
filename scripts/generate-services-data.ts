@@ -67,6 +67,10 @@ function getServiceDisplayName(fileName: string): string {
   name = name.replace(/_64$/, "").replace(/_32$/, "");
   // Replace hyphens and underscores with spaces
   name = name.replace(/[-_]/g, " ");
+  // Remove "AWS" from the service name (case insensitive)
+  name = name.replace(/\bAWS\b/gi, "").trim();
+  // Clean up extra spaces
+  name = name.replace(/\s+/g, " ");
   return name;
 }
 
@@ -84,29 +88,7 @@ function getServiceSlug(displayName: string): string {
  * Generate service description
  */
 function getServiceDescription(serviceName: string, category: string): string {
-  // You can customize these descriptions based on actual AWS services
-  const descriptions: Record<string, string> = {
-    "Amazon EC2":
-      "Secure and resizable compute capacity in the cloud. Launch applications when needed without upfront commitments.",
-    "AWS Lambda":
-      "Run code without thinking about servers. Pay only for the compute time consumed.",
-    "Amazon S3":
-      "Object storage built to retrieve any amount of data from anywhere on the web.",
-    "Amazon RDS":
-      "Managed relational database service for MySQL, PostgreSQL, Oracle, SQL Server, and MariaDB.",
-    "Amazon DynamoDB":
-      "Fast and flexible NoSQL database service for any scale.",
-    "Amazon CloudFront": "Global content delivery network (CDN) service.",
-    "Amazon VPC":
-      "Isolated cloud resources in a virtual network that you define.",
-    "AWS IAM": "Manage access to AWS services and resources securely.",
-  };
-
-  if (descriptions[serviceName]) {
-    return descriptions[serviceName];
-  }
-
-  return `AWS ${serviceName} service in the ${category} category. Learn more about this service and its capabilities.`;
+  return `${serviceName} service in the ${category} category. Learn more about this service and its capabilities.`;
 }
 
 /**
@@ -222,7 +204,7 @@ async function generateServicesData(): Promise<void> {
             name: displayName,
             slug,
             category: categoryName,
-            summary: `AWS ${displayName} service`,
+            summary: `${displayName} service`,
             description: getServiceDescription(displayName, categoryName),
             markdownContent: getServiceMarkdownContent(
               displayName,

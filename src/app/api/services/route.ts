@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
             category: service.category!,
             summary: service.summary!,
             description: service.summary!, // Use summary for description in dashboard
-            htmlContent: service.htmlContent || "",
+            markdownContent: service.markdownContent || "",
             awsDocsUrl: service.awsDocsUrl || "",
             diagramUrl: service.diagramUrl || "",
             iconPath: service.iconPath!,
