@@ -61,6 +61,64 @@ export function ServicePageClient({
 
   const isAdmin = isAuthenticated && user?.isAdmin;
 
+  // Helper function to convert diagrams.net URLs for proper iframe embedding
+  const getEmbeddableDrawioUrl = (url: string): string => {
+    if (!url) return url;
+
+    try {
+      const urlObj = new URL(url);
+
+      // If it's already an app.diagrams.net URL, return as is
+      if (urlObj.hostname === "app.diagrams.net") {
+        return url;
+      }
+
+      // If it's a viewer.diagrams.net URL, we need to convert it
+      if (urlObj.hostname === "viewer.diagrams.net") {
+        // Extract the encoded URL from the hash
+        const hashContent = urlObj.hash;
+
+        // Look for the #U encoded URL part
+        const encodedUrlMatch = hashContent.match(/#U([^#]*)/);
+        if (encodedUrlMatch) {
+          const encodedUrl = encodedUrlMatch[1];
+          const decodedUrl = decodeURIComponent(encodedUrl);
+
+          // Check if it's a GitHub file
+          if (
+            decodedUrl.includes("github.com") ||
+            decodedUrl.includes("githubusercontent.com")
+          ) {
+            // For GitHub files, we need to use the raw URL format
+            let githubRawUrl = decodedUrl;
+            if (
+              decodedUrl.includes("github.com") &&
+              !decodedUrl.includes("raw.githubusercontent.com")
+            ) {
+              // Convert github.com URL to raw.githubusercontent.com
+              githubRawUrl = decodedUrl
+                .replace("github.com/", "raw.githubusercontent.com/")
+                .replace("/blob/", "/");
+            }
+
+            // Create the proper embed URL with GitHub integration
+            return `https://app.diagrams.net/?lightbox=1&edit=_blank&layers=1&nav=1&title=${encodeURIComponent(
+              "Diagram"
+            )}&dark=auto#H${encodeURIComponent(
+              githubRawUrl.replace("https://raw.githubusercontent.com/", "")
+            )}`;
+          }
+        }
+      }
+
+      // For other cases, try to preserve the original URL but make it embeddable
+      return url;
+    } catch (error) {
+      console.warn("Failed to parse diagram URL:", error);
+      return url;
+    }
+  };
+
   // Convert markdown to HTML for rendering
   const renderMarkdown = (markdown: string | null | undefined) => {
     if (!markdown || !markdown.trim()) return "";
@@ -742,7 +800,7 @@ export function ServicePageClient({
                 <div className="space-y-4">
                   <div className="w-full bg-white rounded-lg overflow-hidden border">
                     <iframe
-                      src={service.diagramUrl}
+                      src={getEmbeddableDrawioUrl(service.diagramUrl)}
                       title={`${service.name} Architecture Diagram`}
                       width="100%"
                       height="600"
