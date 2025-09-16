@@ -11,7 +11,17 @@ export async function GET(request: NextRequest) {
     if (category) {
       // Return services for a specific category
       const services = await ServicesDb.getServicesByCategory(category);
-      return NextResponse.json({ success: true, data: services });
+      return NextResponse.json(
+        {
+          success: true,
+          data: services,
+        },
+        {
+          headers: {
+            "Cache-Control": "public, s-maxage=60, stale-while-revalidate=30",
+          },
+        }
+      );
     }
 
     // Return all services grouped by category for dashboard
@@ -49,7 +59,17 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: true, data: servicesByCategory });
+    return NextResponse.json(
+      {
+        success: true,
+        data: servicesByCategory,
+      },
+      {
+        headers: {
+          "Cache-Control": "public, s-maxage=60, stale-while-revalidate=30",
+        },
+      }
+    );
   } catch (error) {
     console.error("Error fetching services:", error);
     return NextResponse.json(

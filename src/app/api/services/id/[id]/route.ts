@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { ServicesDb } from "@/lib/dynamodb";
 import { requireAdmin, createUnauthorizedResponse } from "@/lib/middleware";
 
@@ -70,6 +71,13 @@ export async function PUT(
 
     // Return updated service
     const updatedService = await ServicesDb.getService(id);
+
+    // Revalidate the service page cache to show updated data immediately
+    if (updatedService) {
+      revalidatePath(`/${updatedService.category}/${updatedService.slug}`);
+      revalidatePath("/"); // Also revalidate the dashboard
+    }
+
     return NextResponse.json({ success: true, data: updatedService });
   } catch (error) {
     console.error("Error updating service by ID:", error);

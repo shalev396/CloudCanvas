@@ -17,75 +17,28 @@ async function getServiceData(
   serviceSlug: string
 ): Promise<AwsService | null> {
   try {
-    // Use API route to ensure consistent data processing
-    const baseUrl =
-      process.env.NODE_ENV === "development"
-        ? "http://localhost:3000"
-        : process.env.VERCEL_URL
-        ? `https://${process.env.VERCEL_URL}`
-        : "";
+    // Use direct database query - no HTTP self-fetching in server components
+    const categoryServices = await ServicesDb.getServicesByCategory(category);
+    const service = categoryServices.find((s) => s.slug === serviceSlug);
 
-    const response = await fetch(
-      `${baseUrl}/api/services?category=${category}`
-    );
-
-    if (!response.ok) {
-      throw new Error("Failed to fetch services");
-    }
-
-    const result = await response.json();
-
-    if (result.success && result.data) {
-      // Find the service with matching slug
-      const service = result.data.find(
-        (s: AwsService) => s.slug === serviceSlug
-      );
-
-      // Ensure all string fields have safe defaults
-      if (service) {
-        return {
-          ...service,
-          enabled: service.enabled ?? true,
-          markdownContent: service.markdownContent || "",
-          awsDocsUrl: service.awsDocsUrl || "",
-          diagramUrl: service.diagramUrl || "",
-          summary: service.summary || "",
-          description: service.description || "",
-          name: service.name || "Unknown Service",
-        };
-      }
-
-      return null;
+    // Ensure all string fields have safe defaults
+    if (service) {
+      return {
+        ...service,
+        enabled: service.enabled ?? true,
+        markdownContent: service.markdownContent || "",
+        awsDocsUrl: service.awsDocsUrl || "",
+        diagramUrl: service.diagramUrl || "",
+        summary: service.summary || "",
+        description: service.description || "",
+        name: service.name || "Unknown Service",
+      };
     }
 
     return null;
   } catch (error) {
     console.error("Error fetching service data:", error);
-
-    // Fallback to direct database query
-    try {
-      const categoryServices = await ServicesDb.getServicesByCategory(category);
-      const service = categoryServices.find((s) => s.slug === serviceSlug);
-
-      // Apply same fallback logic as API
-      if (service) {
-        return {
-          ...service,
-          enabled: service.enabled ?? true,
-          markdownContent: service.markdownContent || "",
-          awsDocsUrl: service.awsDocsUrl || "",
-          diagramUrl: service.diagramUrl || "",
-          summary: service.summary || "",
-          description: service.description || "",
-          name: service.name || "Unknown Service",
-        };
-      }
-
-      return null;
-    } catch (fallbackError) {
-      console.error("Fallback fetch also failed:", fallbackError);
-      return null;
-    }
+    return null;
   }
 }
 
@@ -133,3 +86,6 @@ export async function generateMetadata({ params }: ServicePageProps) {
     description: service.summary,
   };
 }
+
+// Revalidate this page every 60 seconds to avoid stale cache after updates
+export const revalidate = 60;
