@@ -9,6 +9,12 @@ import { Search, ChevronDown, ChevronRight } from "lucide-react";
 import Image from "next/image";
 import { ServicesByCategory } from "@/lib/types";
 
+// Service statistics interface
+interface ServiceStats {
+  total: number;
+  available: number;
+}
+
 // Fetch services from API
 async function fetchServices(): Promise<ServicesByCategory[]> {
   try {
@@ -31,6 +37,31 @@ async function fetchServices(): Promise<ServicesByCategory[]> {
     console.error("Error fetching services:", error);
     // Return empty array as fallback
     return [];
+  }
+}
+
+// Fetch service statistics from API
+async function fetchServiceStats(): Promise<ServiceStats> {
+  try {
+    const response = await fetch("/api/services/stats", {
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+
+    if (result.success) {
+      return result.data;
+    } else {
+      throw new Error(result.error || "Failed to fetch service statistics");
+    }
+  } catch (error) {
+    console.error("Error fetching service stats:", error);
+    // Return default values as fallback
+    return { total: 0, available: 0 };
   }
 }
 
@@ -180,19 +211,30 @@ export function ServicesDashboard() {
   );
   const [layoutMode, setLayoutMode] = useState<"grid" | "list">("grid");
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [serviceStats, setServiceStats] = useState<ServiceStats>({
+    total: 0,
+    available: 0,
+  });
 
   // Create refs for each category for scrolling
   const categoryRefs = useRef<{
     [key: string]: React.RefObject<HTMLDivElement | null>;
   }>({});
 
-  // Fetch services from API
+  // Fetch services and stats from API
   useEffect(() => {
-    const loadServices = async () => {
+    const loadData = async () => {
       try {
         setLoading(true);
-        const services = await fetchServices();
+
+        // Fetch services and stats in parallel
+        const [services, stats] = await Promise.all([
+          fetchServices(),
+          fetchServiceStats(),
+        ]);
+
         setServicesByCategory(services);
+        setServiceStats(stats);
 
         // Initialize refs for each category
         const refs: { [key: string]: React.RefObject<HTMLDivElement | null> } =
@@ -202,14 +244,15 @@ export function ServicesDashboard() {
         });
         categoryRefs.current = refs;
       } catch (error) {
-        console.error("Failed to load services:", error);
+        console.error("Failed to load data:", error);
         setServicesByCategory([]);
+        setServiceStats({ total: 0, available: 0 });
       } finally {
         setLoading(false);
       }
     };
 
-    loadServices();
+    loadData();
   }, []);
 
   // Monitor expanded categories to switch layout modes
@@ -292,7 +335,8 @@ export function ServicesDashboard() {
             AWS Services Explorer
           </h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Discover and learn about AWS services organized by categories
+            Currently supports {serviceStats.available} out of{" "}
+            {serviceStats.total} services
           </p>
         </div>
 
