@@ -14,7 +14,16 @@ import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LoginDialog } from "@/components/login-dialog";
 import { CLOUD_PROVIDERS } from "@/lib/categories";
-import { ChevronDown, Cloud, LogIn, LogOut, User, Shield } from "lucide-react";
+import {
+  ChevronDown,
+  Cloud,
+  LogIn,
+  LogOut,
+  User,
+  Shield,
+  Settings,
+} from "lucide-react";
+import Link from "next/link";
 import { useAuth } from "@/contexts/auth-context";
 import Image from "next/image";
 
@@ -47,12 +56,12 @@ export function Navbar() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex h-16 items-center justify-between">
         {/* Logo */}
         <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2">
+          <Link href="/" className="flex items-center space-x-2">
             <Cloud className="h-6 w-6 text-primary" />
             <span className="text-xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
               Cloud Canvas
             </span>
-          </div>
+          </Link>
         </div>
 
         {/* Center Content */}
@@ -190,6 +199,17 @@ export function Navbar() {
                     </div>
                   </div>
                 </div>
+                {user.isAdmin && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild className="cursor-pointer">
+                      <Link href="/admin">
+                        <Settings className="mr-2 h-4 w-4" />
+                        <span>Admin Panel</span>
+                      </Link>
+                    </DropdownMenuItem>
+                  </>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={handleLogout}

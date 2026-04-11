@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { ServicesDb } from "@/lib/dynamodb";
 import { requireAdmin, createUnauthorizedResponse } from "@/lib/middleware";
+import { SERVICES_CACHE_TAG } from "@/lib/cached-data";
 
 export async function GET(
   request: NextRequest,
@@ -72,10 +73,13 @@ export async function PUT(
     // Return updated service
     const updatedService = await ServicesDb.getService(id);
 
-    // Revalidate the service page cache to show updated data immediately
+    // Bust the server-side data cache so fresh DB data is fetched
+    revalidateTag(SERVICES_CACHE_TAG);
+
+    // Revalidate the rendered page cache
     if (updatedService) {
       revalidatePath(`/${updatedService.category}/${updatedService.slug}`);
-      revalidatePath("/"); // Also revalidate the dashboard
+      revalidatePath("/");
     }
 
     return NextResponse.json({ success: true, data: updatedService });

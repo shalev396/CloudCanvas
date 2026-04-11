@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
-import { ServicesDb } from "@/lib/dynamodb";
 import { AWS_CATEGORIES } from "@/lib/categories";
 import { AwsService } from "@/lib/types";
 import { ServicePageClient } from "@/components/service-page-client";
+import { getCachedServicesByCategory } from "@/lib/cached-data";
 
 interface ServicePageProps {
   params: Promise<{
@@ -11,68 +11,63 @@ interface ServicePageProps {
   }>;
 }
 
-// Function to fetch service by category and service slug
-async function getServiceData(
-  category: string,
-  serviceSlug: string
-): Promise<AwsService | null> {
-  try {
-    // Use direct database query - no HTTP self-fetching in server components
-    const categoryServices = await ServicesDb.getServicesByCategory(category);
-    const service = categoryServices.find((s) => s.slug === serviceSlug);
+function findServiceBySlug(
+  services: AwsService[],
+  slug: string
+): AwsService | null {
+  const service = services.find((s) => s.slug === slug);
+  if (!service) return null;
 
-    // Ensure all string fields have safe defaults
-    if (service) {
-      return {
-        ...service,
-        enabled: service.enabled ?? true,
-        markdownContent: service.markdownContent || "",
-        awsDocsUrl: service.awsDocsUrl || "",
-        diagramUrl: service.diagramUrl || "",
-        summary: service.summary || "",
-        description: service.description || "",
-        name: service.name || "Unknown Service",
-      };
-    }
-
-    return null;
-  } catch (error) {
-    console.error("Error fetching service data:", error);
-    return null;
-  }
+  return {
+    ...service,
+    enabled: service.enabled ?? true,
+    markdownContent: service.markdownContent || "",
+    awsDocsUrl: service.awsDocsUrl || "",
+    diagramUrl: service.diagramUrl || "",
+    summary: service.summary || "",
+    description: service.description || "",
+    name: service.name || "Unknown Service",
+  };
 }
 
 export default async function ServicePage({ params }: ServicePageProps) {
   const { category, service: serviceSlug } = await params;
 
-  // Get the service data
-  const service = await getServiceData(category, serviceSlug);
+  const categoryServices = await getCachedServicesByCategory(category);
+  const service = findServiceBySlug(categoryServices, serviceSlug);
 
   if (!service) {
     notFound();
   }
 
-  // Get category info
   const categoryInfo = AWS_CATEGORIES.find((cat) => cat.id === category);
 
   if (!categoryInfo) {
     notFound();
   }
 
-  return <ServicePageClient service={service} categoryInfo={categoryInfo} />;
+  const relatedServices = categoryServices
+    .filter((s) => s.id !== service.id)
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  return (
+    <ServicePageClient
+      service={service}
+      categoryInfo={categoryInfo}
+      relatedServices={relatedServices}
+    />
+  );
 }
 
-// Generate static params for known services (optional - for better performance)
 export async function generateStaticParams() {
-  // This would be called at build time
-  // For now, we'll let Next.js handle dynamic routes
   return [];
 }
 
 export async function generateMetadata({ params }: ServicePageProps) {
   const { category, service: serviceSlug } = await params;
 
-  const service = await getServiceData(category, serviceSlug);
+  const categoryServices = await getCachedServicesByCategory(category);
+  const service = findServiceBySlug(categoryServices, serviceSlug);
 
   if (!service) {
     return {
@@ -86,6 +81,3 @@ export async function generateMetadata({ params }: ServicePageProps) {
     description: service.summary,
   };
 }
-
-// Revalidate this page every 60 seconds to avoid stale cache after updates
-export const revalidate = 60;

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
@@ -33,18 +33,19 @@ import { marked } from "marked";
 interface ServicePageClientProps {
   service: AwsService;
   categoryInfo: CategoryConfig;
+  relatedServices: AwsService[];
 }
 
 export function ServicePageClient({
   service: initialService,
   categoryInfo,
+  relatedServices: initialRelatedServices,
 }: ServicePageClientProps) {
   const { user, isAuthenticated } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [service, setService] = useState(initialService);
-  const [relatedServices, setRelatedServices] = useState<AwsService[]>([]);
-  const [loadingRelated, setLoadingRelated] = useState(true);
+  const [relatedServices] = useState<AwsService[]>(initialRelatedServices);
   const [editData, setEditData] = useState({
     name: service.name || "",
     summary: service.summary || "",
@@ -134,51 +135,7 @@ export function ServicePageClient({
     }
   };
 
-  // Fetch related services from the same category
-  useEffect(() => {
-    const fetchRelatedServices = async () => {
-      try {
-        setLoadingRelated(true);
-        const response = await fetch(
-          `/api/services?category=${initialService.category}`
-        );
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch related services");
-        }
-
-        const result = await response.json();
-
-        if (result.success && result.data) {
-          // Filter out the current service and sort alphabetically
-          const filteredServices = result.data
-            .filter((s: AwsService) => s.id !== initialService.id)
-            .sort((a: AwsService, b: AwsService) =>
-              a.name.localeCompare(b.name)
-            );
-          setRelatedServices(filteredServices);
-        }
-      } catch (error) {
-        console.error("Error fetching related services:", error);
-        setRelatedServices([]);
-      } finally {
-        setLoadingRelated(false);
-      }
-    };
-
-    fetchRelatedServices();
-  }, [initialService.category, initialService.id]);
-
-  // Memoize related services grid to prevent unnecessary re-renders
   const relatedServicesGrid = useMemo(() => {
-    if (loadingRelated) {
-      return (
-        <div className="flex items-center justify-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
-        </div>
-      );
-    }
-
     if (relatedServices.length === 0) {
       return (
         <p className="text-muted-foreground text-sm">
@@ -208,7 +165,7 @@ export function ServicePageClient({
         </div>
       </div>
     );
-  }, [relatedServices, loadingRelated, categoryInfo.displayName]);
+  }, [relatedServices, categoryInfo.displayName]);
 
   const handleEdit = () => {
     setIsEditing(true);

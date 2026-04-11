@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -9,60 +9,9 @@ import { Search, ChevronDown, ChevronRight } from "lucide-react";
 import Image from "next/image";
 import { ServicesByCategory } from "@/lib/types";
 
-// Service statistics interface
 interface ServiceStats {
   total: number;
   available: number;
-}
-
-// Fetch services from API
-async function fetchServices(): Promise<ServicesByCategory[]> {
-  try {
-    const response = await fetch("/api/services", {
-      cache: "no-store", // Ensure we get fresh data
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const result = await response.json();
-
-    if (result.success) {
-      return result.data;
-    } else {
-      throw new Error(result.error || "Failed to fetch services");
-    }
-  } catch (error) {
-    console.error("Error fetching services:", error);
-    // Return empty array as fallback
-    return [];
-  }
-}
-
-// Fetch service statistics from API
-async function fetchServiceStats(): Promise<ServiceStats> {
-  try {
-    const response = await fetch("/api/services/stats", {
-      cache: "no-store",
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const result = await response.json();
-
-    if (result.success) {
-      return result.data;
-    } else {
-      throw new Error(result.error || "Failed to fetch service statistics");
-    }
-  } catch (error) {
-    console.error("Error fetching service stats:", error);
-    // Return default values as fallback
-    return { total: 0, available: 0 };
-  }
 }
 
 interface CategoryCardProps {
@@ -200,63 +149,38 @@ function CategoryRow({
   );
 }
 
-export function ServicesDashboard() {
+interface ServicesDashboardProps {
+  servicesByCategory: ServicesByCategory[];
+  serviceStats: ServiceStats;
+}
+
+export function ServicesDashboard({
+  servicesByCategory: initialServicesByCategory,
+  serviceStats,
+}: ServicesDashboardProps) {
   const [searchTerm, setSearchTerm] = useState("");
-  const [servicesByCategory, setServicesByCategory] = useState<
-    ServicesByCategory[]
-  >([]);
-  const [loading, setLoading] = useState(true);
+  const [servicesByCategory] = useState<ServicesByCategory[]>(
+    initialServicesByCategory
+  );
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
     new Set()
   );
   const [layoutMode, setLayoutMode] = useState<"grid" | "list">("grid");
   const [isTransitioning, setIsTransitioning] = useState(false);
-  const [serviceStats, setServiceStats] = useState<ServiceStats>({
-    total: 0,
-    available: 0,
-  });
 
-  // Create refs for each category for scrolling
   const categoryRefs = useRef<{
     [key: string]: React.RefObject<HTMLDivElement | null>;
-  }>({});
-
-  // Fetch services and stats from API
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        setLoading(true);
-
-        // Fetch services and stats in parallel
-        const [services, stats] = await Promise.all([
-          fetchServices(),
-          fetchServiceStats(),
-        ]);
-
-        setServicesByCategory(services);
-        setServiceStats(stats);
-
-        // Initialize refs for each category
-        const refs: { [key: string]: React.RefObject<HTMLDivElement | null> } =
-          {};
-        services.forEach((category) => {
-          refs[category.category] = React.createRef<HTMLDivElement>();
-        });
-        categoryRefs.current = refs;
-      } catch (error) {
-        console.error("Failed to load data:", error);
-        setServicesByCategory([]);
-        setServiceStats({ total: 0, available: 0 });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadData();
-  }, []);
+  }>(
+    Object.fromEntries(
+      initialServicesByCategory.map((category) => [
+        category.category,
+        React.createRef<HTMLDivElement>(),
+      ])
+    )
+  );
 
   // Monitor expanded categories to switch layout modes
-  useEffect(() => {
+  React.useEffect(() => {
     const hasExpandedCategories = expandedCategories.size > 0;
     const newMode = hasExpandedCategories ? "list" : "grid";
 
@@ -314,17 +238,6 @@ export function ServicesDashboard() {
     }))
     .filter((category) => category.services.length > 0)
     .sort((a, b) => a.displayName.localeCompare(b.displayName)); // Sort alphabetically
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="text-muted-foreground">Loading AWS services...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/5">
@@ -394,7 +307,7 @@ export function ServicesDashboard() {
         </div>
 
         {/* No Results */}
-        {filteredCategories.length === 0 && !loading && (
+        {filteredCategories.length === 0 && (
           <div className="text-center py-12">
             <p className="text-muted-foreground text-lg">
               No services found matching &quot;{searchTerm}&quot;
