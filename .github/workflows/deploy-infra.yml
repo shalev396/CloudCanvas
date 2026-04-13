@@ -75,11 +75,11 @@ jobs:
               UsersTableName="${{ secrets.USERS_TABLE_NAME }}" \
               CategoriesTableName="${{ secrets.CATEGORIES_TABLE_NAME }}"
 
-      - name: Print stack outputs
+      - name: Print stack status
         env:
           STAGE: ${{ needs.resolve-stage.outputs.stage }}
         run: |
           aws cloudformation describe-stacks \
             --stack-name "cloudcanvas-${STAGE}" \
-            --query "Stacks[0].Outputs" \
-            --output table
+            --query "Stacks[0].StackStatus" \
+            --output text
