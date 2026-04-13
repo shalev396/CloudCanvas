@@ -2,7 +2,12 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { ClientAuthUtils } from "@/lib/auth-client";
-import { JwtPayload, LoginRequest, AuthResponse } from "@/lib/types";
+import {
+  JwtPayload,
+  LoginRequest,
+  RegisterRequest,
+  AuthResponse,
+} from "@/lib/types";
 
 interface AuthContextType {
   user: JwtPayload | null;
@@ -10,6 +15,9 @@ interface AuthContextType {
   isLoading: boolean;
   login: (
     credentials: LoginRequest
+  ) => Promise<{ success: boolean; error?: string }>;
+  register: (
+    data: RegisterRequest
   ) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   refreshUser: () => void;
@@ -75,6 +83,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const register = async (
+    data: RegisterRequest
+  ): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        const authData: AuthResponse = result.data;
+        ClientAuthUtils.setToken(authData.token);
+        setUser(ClientAuthUtils.getCurrentUser());
+        return { success: true };
+      }
+      return { success: false, error: result.error || "Registration failed" };
+    } catch (error) {
+      console.error("Register error:", error);
+      return { success: false, error: "Network error" };
+    }
+  };
+
   const logout = () => {
     ClientAuthUtils.removeToken();
     setUser(null);
@@ -93,6 +126,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isAuthenticated: !!user,
     isLoading,
     login,
+    register,
     logout,
     refreshUser,
   };

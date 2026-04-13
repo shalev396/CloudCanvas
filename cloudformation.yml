@@ -1,0 +1,360 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: CloudCanvas infrastructure - DynamoDB, S3, CloudFront, IAM (Vercel OIDC)
+
+Parameters:
+  Stage:
+    Type: String
+    AllowedValues: [dev, prod]
+    Description: Deployment stage
+
+  VercelDomain:
+    Type: String
+    Description: Vercel default project domain (e.g. cloudcanvas-xxx.vercel.app)
+
+  CustomDomain:
+    Type: String
+    Description: Custom domain for the site (e.g. cloudcanvas.shalev396.com)
+
+  ACMCertificateArn:
+    Type: String
+    Description: ARN of ACM certificate in us-east-1 for the custom domain
+
+  HostedZoneId:
+    Type: AWS::Route53::HostedZone::Id
+    Description: Route53 hosted zone ID for the parent domain (e.g. shalev396.com)
+
+  VercelTeamSlug:
+    Type: String
+    Description: Vercel team slug (e.g. shalev396)
+
+  VercelProjectName:
+    Type: String
+    Description: Vercel project name (e.g. cloud-canvas)
+
+  VercelOIDCProviderArn:
+    Type: String
+    Description: ARN of the existing Vercel OIDC provider in IAM
+
+  ImagesBucketName:
+    Type: String
+    Description: S3 bucket name for images (must be globally unique)
+    AllowedPattern: "^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$"
+
+  ServicesTableName:
+    Type: String
+    Description: DynamoDB table name for services
+
+  UsersTableName:
+    Type: String
+    Description: DynamoDB table name for users
+
+  CategoriesTableName:
+    Type: String
+    Description: DynamoDB table name for categories
+
+Resources:
+  # ─── DynamoDB ────────────────────────────────────────────────────────
+
+  ServicesTable:
+    Type: AWS::DynamoDB::Table
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Ref ServicesTableName
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: category
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: CategoryIndex
+          KeySchema:
+            - AttributeName: category
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      Tags:
+        - Key: Environment
+          Value: !Ref Stage
+        - Key: Service
+          Value: cloudcanvas
+
+  UsersTable:
+    Type: AWS::DynamoDB::Table
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Ref UsersTableName
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: email
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: EmailIndex
+          KeySchema:
+            - AttributeName: email
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      Tags:
+        - Key: Environment
+          Value: !Ref Stage
+        - Key: Service
+          Value: cloudcanvas
+
+  CategoriesTable:
+    Type: AWS::DynamoDB::Table
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Ref CategoriesTableName
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      Tags:
+        - Key: Environment
+          Value: !Ref Stage
+        - Key: Service
+          Value: cloudcanvas
+
+  # ─── S3 Bucket for Images ───────────────────────────────────────────
+
+  ImagesBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref ImagesBucketName
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Environment
+          Value: !Ref Stage
+        - Key: Service
+          Value: cloudcanvas
+
+  ImagesBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ImagesBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowCloudFrontOAC
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub "${ImagesBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                "AWS:SourceArn": !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution}"
+
+  # ─── CloudFront ─────────────────────────────────────────────────────
+
+  CloudFrontOAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub "cloudcanvas-oac-${Stage}"
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: !Sub "CloudCanvas ${Stage}"
+        Aliases:
+          - !Ref CustomDomain
+        ViewerCertificate:
+          AcmCertificateArn: !Ref ACMCertificateArn
+          SslSupportMethod: sni-only
+          MinimumProtocolVersion: TLSv1.2_2021
+        HttpVersion: http2and3
+        DefaultRootObject: ""
+
+        Origins:
+          - Id: S3Images
+            DomainName: !GetAtt ImagesBucket.RegionalDomainName
+            OriginAccessControlId: !Ref CloudFrontOAC
+            S3OriginConfig:
+              OriginAccessIdentity: ""
+
+          - Id: VercelApp
+            DomainName: !Ref VercelDomain
+            CustomOriginConfig:
+              HTTPSPort: 443
+              OriginProtocolPolicy: https-only
+              OriginSSLProtocols:
+                - TLSv1.2
+
+        DefaultCacheBehavior:
+          TargetOriginId: VercelApp
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]
+          CachedMethods: [GET, HEAD]
+          CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad  # CachingDisabled
+          OriginRequestPolicyId: 216adef6-5c7f-47e4-b989-5492eafa07d3  # AllViewer
+          Compress: true
+
+        CacheBehaviors:
+          - PathPattern: "/images/*"
+            TargetOriginId: S3Images
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods: [GET, HEAD]
+            CachedMethods: [GET, HEAD]
+            CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6  # CachingOptimized
+            Compress: true
+
+      Tags:
+        - Key: Environment
+          Value: !Ref Stage
+        - Key: Service
+          Value: cloudcanvas
+
+  # ─── Route53 alias for the CloudFront distribution ──────────────────
+
+  CloudFrontDnsRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref CustomDomain
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt CloudFrontDistribution.DomainName
+        # Fixed CloudFront hosted zone ID for alias records (global).
+        HostedZoneId: Z2FDTNDATAQYW2
+        EvaluateTargetHealth: false
+
+  CloudFrontDnsRecordAAAA:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref CustomDomain
+      Type: AAAA
+      AliasTarget:
+        DNSName: !GetAtt CloudFrontDistribution.DomainName
+        HostedZoneId: Z2FDTNDATAQYW2
+        EvaluateTargetHealth: false
+
+  # ─── Vercel IAM Role (uses existing OIDC provider) ───────────────────
+
+  VercelAppRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "cloudcanvas-vercel-${Stage}"
+      AssumeRolePolicyDocument:
+        Fn::Sub:
+          - |
+            {
+              "Version": "2012-10-17",
+              "Statement": [{
+                "Effect": "Allow",
+                "Principal": { "Federated": "${OIDCArn}" },
+                "Action": "sts:AssumeRoleWithWebIdentity",
+                "Condition": {
+                  "StringEquals": {
+                    "oidc.vercel.com/${TeamSlug}:aud": "https://vercel.com/${TeamSlug}"
+                  },
+                  "StringLike": {
+                    "oidc.vercel.com/${TeamSlug}:sub": "owner:${TeamSlug}:project:${ProjectName}:*"
+                  }
+                }
+              }]
+            }
+          - OIDCArn: !Ref VercelOIDCProviderArn
+            TeamSlug: !Ref VercelTeamSlug
+            ProjectName: !Ref VercelProjectName
+      Policies:
+        - PolicyName: !Sub "cloudcanvas-app-policy-${Stage}"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: DynamoDB
+                Effect: Allow
+                Action:
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:BatchGetItem
+                  - dynamodb:BatchWriteItem
+                  - dynamodb:DescribeTable
+                Resource:
+                  - !GetAtt ServicesTable.Arn
+                  - !GetAtt UsersTable.Arn
+                  - !GetAtt CategoriesTable.Arn
+                  - !Sub "${ServicesTable.Arn}/index/CategoryIndex"
+                  - !Sub "${UsersTable.Arn}/index/EmailIndex"
+              - Sid: S3
+                Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:DeleteObject
+                  - s3:ListBucket
+                Resource:
+                  - !GetAtt ImagesBucket.Arn
+                  - !Sub "${ImagesBucket.Arn}/*"
+      Tags:
+        - Key: Environment
+          Value: !Ref Stage
+        - Key: Service
+          Value: cloudcanvas
+
+Outputs:
+  ServicesTableName:
+    Description: Services DynamoDB table name
+    Value: !Ref ServicesTableName
+
+  UsersTableName:
+    Description: Users DynamoDB table name
+    Value: !Ref UsersTableName
+
+  CategoriesTableName:
+    Description: Categories DynamoDB table name
+    Value: !Ref CategoriesTableName
+
+  ImagesBucketName:
+    Description: S3 bucket for images
+    Value: !Ref ImagesBucket
+
+  CloudFrontDomain:
+    Description: CloudFront distribution domain (point your DNS CNAME here)
+    Value: !GetAtt CloudFrontDistribution.DomainName
+
+  CloudFrontDistributionId:
+    Description: CloudFront distribution ID
+    Value: !Ref CloudFrontDistribution
+
+  Region:
+    Description: AWS region
+    Value: !Ref "AWS::Region"
+
+  VercelRoleArn:
+    Description: IAM Role ARN for Vercel OIDC (set as AWS_ROLE_ARN in Vercel env vars)
+    Value: !GetAtt VercelAppRole.Arn

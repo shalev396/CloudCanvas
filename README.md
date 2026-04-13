@@ -4,7 +4,7 @@
 
 I needed a way to learn cloud services for the AWS Cloud Practitioner exam and really hated traditional notes because they're unorganized. So I built my own interactive learning platform for cloud services.
 
-🌐 **Live Demo:** [https://cloudcanvas.shalev396.com](https://cloudcanvas.shalev396.com)
+🌐 **Live at:** [https://cloudcanvas.shalev396.com](https://cloudcanvas.shalev396.com)
 
 ## ✨ Features
 
@@ -17,24 +17,26 @@ I needed a way to learn cloud services for the AWS Cloud Practitioner exam and r
 
 ## 🚀 Tech Stack
 
-- **Next.js 15** with TypeScript
-- **Tailwind CSS** for styling
-- **AWS DynamoDB** for data storage
-- **Serverless Framework** for infrastructure
-- **JWT Authentication**
+- **Next.js 15** (App Router, Turbopack) with TypeScript
+- **Tailwind CSS 4** + shadcn/ui (Radix primitives)
+- **AWS DynamoDB** for data (services, users, categories)
+- **Amazon S3 + CloudFront** for icon hosting
+- **AWS CloudFormation** for all infrastructure
+- **Vercel** for frontend hosting (OIDC-assumed IAM role — no static AWS keys in prod)
+- **JWT Authentication** (bcrypt + 7-day tokens)
 
 ## 📦 Installation
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/cloudcanvas.git
-cd cloudcanvas
+git clone https://github.com/shalev396/CloudCanvas.git
+cd CloudCanvas
 
 # Install dependencies
 npm install
 
 # Setup environment variables
-# Copy env.template to .env.local and configure
+cp .env.template .env.development
 
 # Start development
 npm run dev
@@ -42,19 +44,13 @@ npm run dev
 
 ### Environment Setup
 
-Create `.env.development` file:
+Create `.env.development` (AWS credentials resolve from `~/.aws/credentials` locally):
 
-```env
-ENV="dev"
-AWS_REGION=""
-AWS_ACCESS_KEY_ID=""
-AWS_SECRET_ACCESS_KEY=""
-SERVICES_TABLE_NAME=""
-USERS_TABLE_NAME=""
-JWT_SECRET=""
-ADMIN_EMAIL=""
-ADMIN_PASSWORD=""
-ADMIN_NAME=""
+### Deploy Infrastructure
+
+```bash
+npm run deploy:dev    # Deploy CloudFormation stack (dev)
+npm run deploy:prod   # Deploy CloudFormation stack (prod)
 ```
 
 ## 🎯 Usage

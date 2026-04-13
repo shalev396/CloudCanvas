@@ -33,10 +33,13 @@ import {
 } from "lucide-react";
 
 interface RestoreResult {
-  created: number;
+  backupCount: number;
+  currentCount: number;
   updated: number;
-  deleted: number;
-  skipped: number;
+  unchanged: number;
+  unmatchedCount: number;
+  unmatched: { name: string; iconPath: string; slug: string }[];
+  matchedByStrategy: Record<string, number>;
 }
 
 interface SeedResult {
@@ -48,8 +51,16 @@ interface SeedResult {
   categoryIconsSkipped: number;
   categoryIconsUpdated: number;
   groupIconsExtracted: number;
+  categoriesUpserted: number;
   servicesCreated: number;
   servicesSkipped: number;
+  staleServicesDeleted: number;
+}
+
+interface ClearResult {
+  servicesDeleted: number;
+  categoriesDeleted: number;
+  s3ObjectsDeleted: number;
 }
 
 export function AdminPanel() {
@@ -74,8 +85,9 @@ export function AdminPanel() {
   const seedInputRef = useRef<HTMLInputElement>(null);
 
   const [clearLoading, setClearLoading] = useState(false);
-  const [clearResult, setClearResult] = useState<number | null>(null);
+  const [clearResult, setClearResult] = useState<ClearResult | null>(null);
   const [clearError, setClearError] = useState<string | null>(null);
+
 
   if (isLoading) {
     return (
@@ -218,7 +230,7 @@ export function AdminPanel() {
       });
       const result = await res.json();
       if (!result.success) throw new Error(result.error || "Clear failed");
-      setClearResult(result.data.deleted);
+      setClearResult(result.data);
     } catch (err) {
       setClearError(err instanceof Error ? err.message : "Clear failed");
     } finally {
@@ -336,22 +348,54 @@ export function AdminPanel() {
               </p>
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <span>
-                  Created:{" "}
-                  <Badge variant="secondary">{restoreResult.created}</Badge>
+                  Backup / Current:{" "}
+                  <Badge variant="secondary">
+                    {restoreResult.backupCount} / {restoreResult.currentCount}
+                  </Badge>
                 </span>
                 <span>
                   Updated:{" "}
                   <Badge variant="secondary">{restoreResult.updated}</Badge>
                 </span>
                 <span>
-                  Deleted:{" "}
-                  <Badge variant="secondary">{restoreResult.deleted}</Badge>
+                  Unchanged:{" "}
+                  <Badge variant="secondary">{restoreResult.unchanged}</Badge>
                 </span>
                 <span>
-                  Skipped:{" "}
-                  <Badge variant="secondary">{restoreResult.skipped}</Badge>
+                  Unmatched:{" "}
+                  <Badge
+                    variant={
+                      restoreResult.unmatchedCount > 0 ? "destructive" : "secondary"
+                    }
+                  >
+                    {restoreResult.unmatchedCount}
+                  </Badge>
                 </span>
               </div>
+              <div className="text-xs text-muted-foreground">
+                Matched by:{" "}
+                {Object.entries(restoreResult.matchedByStrategy)
+                  .filter(([, n]) => n > 0)
+                  .map(([k, n]) => `${k}=${n}`)
+                  .join(", ") || "none"}
+              </div>
+              {restoreResult.unmatched.length > 0 && (
+                <div className="mt-2 rounded border border-destructive/30 bg-destructive/5 p-2">
+                  <p className="text-xs font-medium mb-1">
+                    Backup services without a match in the current DB:
+                  </p>
+                  <ul className="text-xs space-y-0.5 max-h-48 overflow-auto">
+                    {restoreResult.unmatched.map((u) => (
+                      <li key={u.iconPath + u.slug}>
+                        <span className="font-medium">{u.name}</span>{" "}
+                        <span className="text-muted-foreground">
+                          ({u.iconPath})
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           )}
           {restoreError && (
@@ -374,7 +418,7 @@ export function AdminPanel() {
           <p className="text-sm text-muted-foreground">
             Delete all service records from the database. Use this to start fresh
             before re-seeding from an icons zip. This does not remove icon files
-            from disk.
+            from S3.
           </p>
 
           <AlertDialog>
@@ -418,9 +462,19 @@ export function AdminPanel() {
                 <CheckCircle2 className="h-4 w-4 text-green-500" /> Clear
                 Complete
               </p>
-              <p className="text-sm">
-                Deleted{" "}
-                <Badge variant="secondary">{clearResult}</Badge> services.
+              <p className="text-sm flex flex-wrap gap-x-3 gap-y-1">
+                <span>
+                  Services:{" "}
+                  <Badge variant="secondary">{clearResult.servicesDeleted}</Badge>
+                </span>
+                <span>
+                  Categories:{" "}
+                  <Badge variant="secondary">{clearResult.categoriesDeleted}</Badge>
+                </span>
+                <span>
+                  S3 objects:{" "}
+                  <Badge variant="secondary">{clearResult.s3ObjectsDeleted}</Badge>
+                </span>
               </p>
             </div>
           )}
@@ -443,7 +497,7 @@ export function AdminPanel() {
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
             Upload the AWS Architecture Icons zip package. The system will extract
-            64px Architecture-Service SVGs, write them to the public directory,
+            64px Architecture-Service SVGs, upload them to S3,
             create database records for new services, and clean up orphaned icons.
           </p>
           <input
@@ -472,7 +526,7 @@ export function AdminPanel() {
                   Confirm Seed
                 </AlertDialogTitle>
                 <AlertDialogDescription>
-                  This will extract icons into the public directory, create
+                  This will extract icons and upload them to S3, create
                   database records for new services, and remove orphaned icon
                   files. Existing service records will not be overwritten.
                 </AlertDialogDescription>
@@ -547,12 +601,20 @@ export function AdminPanel() {
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   <span>
-                    Created:{" "}
+                    Services created:{" "}
                     <Badge variant="secondary">{seedResult.servicesCreated}</Badge>
                   </span>
                   <span>
-                    Skipped:{" "}
+                    Services skipped:{" "}
                     <Badge variant="secondary">{seedResult.servicesSkipped}</Badge>
+                  </span>
+                  <span>
+                    Categories upserted:{" "}
+                    <Badge variant="secondary">{seedResult.categoriesUpserted}</Badge>
+                  </span>
+                  <span>
+                    Stale services deleted:{" "}
+                    <Badge variant="secondary">{seedResult.staleServicesDeleted}</Badge>
                   </span>
                 </div>
               </div>

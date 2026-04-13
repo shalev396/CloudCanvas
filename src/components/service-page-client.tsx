@@ -28,6 +28,7 @@ import {
   FileText,
 } from "lucide-react";
 import { AwsService, CategoryConfig } from "@/lib/types";
+import { resolveImageUrl } from "@/lib/image-url";
 import { marked } from "marked";
 
 interface ServicePageClientProps {
@@ -85,17 +86,23 @@ export function ServicePageClient({
           const encodedUrl = encodedUrlMatch[1];
           const decodedUrl = decodeURIComponent(encodedUrl);
 
-          // Check if it's a GitHub file
-          if (
-            decodedUrl.includes("github.com") ||
-            decodedUrl.includes("githubusercontent.com")
-          ) {
+          let decodedHost = "";
+          try {
+            decodedHost = new URL(decodedUrl).hostname.toLowerCase();
+          } catch {
+            return url;
+          }
+          const isGithubHost =
+            decodedHost === "github.com" ||
+            decodedHost.endsWith(".github.com");
+          const isGithubUserContent =
+            decodedHost === "githubusercontent.com" ||
+            decodedHost.endsWith(".githubusercontent.com");
+
+          if (isGithubHost || isGithubUserContent) {
             // For GitHub files, we need to use the raw URL format
             let githubRawUrl = decodedUrl;
-            if (
-              decodedUrl.includes("github.com") &&
-              !decodedUrl.includes("raw.githubusercontent.com")
-            ) {
+            if (isGithubHost && decodedHost !== "raw.githubusercontent.com") {
               // Convert github.com URL to raw.githubusercontent.com
               githubRawUrl = decodedUrl
                 .replace("github.com/", "raw.githubusercontent.com/")
@@ -282,7 +289,7 @@ export function ServicePageClient({
             <div className="flex justify-center">
               <div className="relative w-20 h-20 flex-shrink-0">
                 <Image
-                  src={service.iconPath}
+                  src={resolveImageUrl(service.iconPath)}
                   alt={service.name}
                   fill
                   className="object-contain"
@@ -318,7 +325,7 @@ export function ServicePageClient({
             <div className="flex justify-center items-center gap-2">
               <div className="relative w-5 h-5">
                 <Image
-                  src={categoryInfo.iconPath}
+                  src={resolveImageUrl(categoryInfo.iconPath)}
                   alt={categoryInfo.displayName}
                   fill
                   className="object-contain"
@@ -494,7 +501,7 @@ export function ServicePageClient({
               {/* Desktop: Service Icon */}
               <div className="relative w-24 h-24 flex-shrink-0">
                 <Image
-                  src={service.iconPath}
+                  src={resolveImageUrl(service.iconPath)}
                   alt={service.name}
                   fill
                   className="object-contain"
@@ -508,7 +515,7 @@ export function ServicePageClient({
                     <div className="flex items-center gap-3 mb-2">
                       <div className="relative w-6 h-6">
                         <Image
-                          src={categoryInfo.iconPath}
+                          src={resolveImageUrl(categoryInfo.iconPath)}
                           alt={categoryInfo.displayName}
                           fill
                           className="object-contain"

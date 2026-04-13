@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { requireAdmin, createUnauthorizedResponse } from "@/lib/middleware";
-import { BatchOperations, ServicesDb } from "@/lib/dynamodb";
+import { BatchOperations, CategoriesDb, ServicesDb } from "@/lib/dynamodb";
 import { SERVICES_CACHE_TAG } from "@/lib/cached-data";
+import { deleteAllObjects } from "@/lib/s3";
 
 export async function POST(request: NextRequest) {
   const auth = await requireAdmin(request);
@@ -10,16 +11,30 @@ export async function POST(request: NextRequest) {
     return createUnauthorizedResponse(auth.error);
   }
 
-  const allServices = await ServicesDb.getAllServices();
-  const count = allServices.length;
+  const [allServices, allCategories] = await Promise.all([
+    ServicesDb.getAllServices(),
+    CategoriesDb.getAllCategories(),
+  ]);
+  const servicesDeleted = allServices.length;
+  const categoriesDeleted = allCategories.length;
 
-  await BatchOperations.clearAllServices();
+  await Promise.all([
+    BatchOperations.clearAllServices(),
+    CategoriesDb.clearAllCategories(),
+  ]);
+
+  const s3ObjectsDeleted = await deleteAllObjects("images/");
 
   revalidateTag(SERVICES_CACHE_TAG);
   revalidatePath("/");
 
   return NextResponse.json({
     success: true,
-    data: { deleted: count },
+    data: {
+      deleted: servicesDeleted,
+      servicesDeleted,
+      categoriesDeleted,
+      s3ObjectsDeleted,
+    },
   });
 }

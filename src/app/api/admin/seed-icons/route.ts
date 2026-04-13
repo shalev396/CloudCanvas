@@ -1,55 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath, revalidateTag } from "next/cache";
-import * as fs from "fs/promises";
-import * as path from "path";
 import JSZip from "jszip";
 import { requireAdmin, createUnauthorizedResponse } from "@/lib/middleware";
-import { ServicesDb } from "@/lib/dynamodb";
+import { ServicesDb, CategoriesDb } from "@/lib/dynamodb";
 import { SERVICES_CACHE_TAG } from "@/lib/cached-data";
 import {
-  categoryMapping,
+  extractCategoryIdFromFolder,
+  extractCategoryIdFromIconFile,
+  deriveCategoryDisplayName,
+  deriveCategoryDescription,
   buildServiceRecord,
 } from "@/lib/service-generator";
+import {
+  uploadIcon,
+  getIconContent,
+  listIcons,
+  deleteIcon,
+} from "@/lib/s3";
 
-const PUBLIC_AWS = path.join(process.cwd(), "public", "aws");
-const ARCH_SERVICE_DIR = path.join(PUBLIC_AWS, "Architecture-Service");
-const CATEGORY_DIR = path.join(PUBLIC_AWS, "Category");
-const ARCH_GROUP_DIR = path.join(PUBLIC_AWS, "Architecture-Group");
-
-/**
- * Zip category icon filenames may differ from what the app expects.
- * Map zip filenames -> on-disk filenames the app references in categories.ts.
- */
-const categoryIconRenameMap: Record<string, string> = {
-  "Arch-Category_Databases_64.svg": "Arch-Category_Database_64.svg",
-  "Arch-Category_Security-Identity_64.svg":
-    "Arch-Category_Security-Identity-Compliance_64.svg",
-  "Arch-Category_Management-Tools_64.svg":
-    "Arch-Category_Management-Governance_64.svg",
-  "Arch-Category_App-Integration_64.svg":
-    "Arch-Category_Application-Integration_64.svg",
-};
-
-async function writeIconFile(
-  targetDir: string,
-  targetFile: string,
+async function uploadIconToS3(
+  s3Key: string,
   newContent: Buffer
 ): Promise<"extracted" | "updated" | "skipped"> {
-  let existingContent: Buffer | null = null;
-  try {
-    existingContent = await fs.readFile(targetFile);
-  } catch {
-    // File doesn't exist yet
-  }
+  const existing = await getIconContent(s3Key);
 
-  if (existingContent && Buffer.compare(existingContent, newContent) === 0) {
+  if (existing && Buffer.compare(existing, newContent) === 0) {
     return "skipped";
-  } else if (existingContent) {
-    await fs.writeFile(targetFile, newContent);
+  } else if (existing) {
+    await uploadIcon(s3Key, newContent);
     return "updated";
   } else {
-    await fs.mkdir(targetDir, { recursive: true });
-    await fs.writeFile(targetFile, newContent);
+    await uploadIcon(s3Key, newContent);
     return "extracted";
   }
 }
@@ -57,10 +38,7 @@ async function writeIconFile(
 /**
  * Find a top-level folder in the zip matching a keyword, ignoring __MACOSX.
  */
-function findZipFolder(
-  zip: JSZip,
-  keyword: string
-): string {
+function findZipFolder(zip: JSZip, keyword: string): string {
   for (const filePath of Object.keys(zip.files)) {
     if (filePath.startsWith("__MACOSX")) continue;
     if (filePath.includes(keyword)) {
@@ -88,11 +66,77 @@ export async function POST(request: NextRequest) {
   const buffer = Buffer.from(await file.arrayBuffer());
   const zip = await JSZip.loadAsync(buffer);
 
-  let iconsExtracted = 0;
-  let iconsSkipped = 0;
-  let iconsUpdated = 0;
+  // ── 1. Discover categories from Category-Icons in the zip ────────────
 
-  // ── 1. Architecture-Service Icons ─────────────────────────────────────
+  const discoveredCategories = new Map<
+    string,
+    { iconFileName: string; s3IconPath: string }
+  >();
+
+  let categoryIconsExtracted = 0;
+  let categoryIconsSkipped = 0;
+  let categoryIconsUpdated = 0;
+
+  const catPrefix = findZipFolder(zip, "Category-Icons");
+
+  if (catPrefix) {
+    const categoryEntries: {
+      categoryId: string;
+      fileName: string;
+      zipFile: JSZip.JSZipObject;
+    }[] = [];
+
+    zip.forEach((relativePath, zipEntry) => {
+      if (zipEntry.dir) return;
+      if (relativePath.startsWith("__MACOSX")) return;
+      if (!relativePath.startsWith(catPrefix)) return;
+      if (!relativePath.toLowerCase().endsWith(".svg")) return;
+
+      const fileName = relativePath.split("/").pop()!;
+      if (!fileName.includes("64")) return;
+      if (!fileName.startsWith("Arch-Category_")) return;
+
+      const categoryId = extractCategoryIdFromIconFile(fileName);
+      if (!categoryId) return;
+
+      categoryEntries.push({ categoryId, fileName, zipFile: zipEntry });
+    });
+
+    for (const entry of categoryEntries) {
+      const s3Key = `images/aws/Category/${entry.fileName}`;
+      const newContent = await entry.zipFile.async("nodebuffer");
+      const result = await uploadIconToS3(s3Key, newContent);
+      if (result === "extracted") categoryIconsExtracted++;
+      else if (result === "updated") categoryIconsUpdated++;
+      else categoryIconsSkipped++;
+
+      discoveredCategories.set(entry.categoryId, {
+        iconFileName: entry.fileName,
+        s3IconPath: `/images/aws/Category/${entry.fileName}`,
+      });
+    }
+  }
+
+  // ── 2. Upsert category records in DynamoDB ──────────────────────────
+
+  let categoriesUpserted = 0;
+
+  for (const [categoryId, info] of discoveredCategories) {
+    const displayName = deriveCategoryDisplayName(categoryId);
+    const description = deriveCategoryDescription(displayName);
+
+    await CategoriesDb.upsertCategory({
+      id: categoryId,
+      name: categoryId,
+      displayName,
+      description,
+      iconPath: info.s3IconPath,
+      enabled: true,
+    });
+    categoriesUpserted++;
+  }
+
+  // ── 3. Architecture-Service Icons ─────────────────────────────────────
 
   const archPrefix = findZipFolder(zip, "Architecture-Service-Icons");
   if (!archPrefix) {
@@ -106,8 +150,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  let iconsExtracted = 0;
+  let iconsSkipped = 0;
+  let iconsUpdated = 0;
+
   const svgEntries: {
     zipCategoryFolder: string;
+    categoryId: string;
     fileName: string;
     zipFile: JSZip.JSZipObject;
   }[] = [];
@@ -124,29 +173,31 @@ export async function POST(request: NextRequest) {
 
     const [categoryFolder, sizeFolder, fileName] = segments;
     if (sizeFolder !== "64") return;
-    if (!categoryFolder.startsWith("Arch_")) return;
-    if (!categoryMapping[categoryFolder]) return;
+
+    const categoryId = extractCategoryIdFromFolder(categoryFolder);
+    if (!categoryId) return;
+    if (!discoveredCategories.has(categoryId)) return;
 
     svgEntries.push({
       zipCategoryFolder: categoryFolder,
+      categoryId,
       fileName,
       zipFile: zipEntry,
     });
   });
 
-  const targetServicePaths = new Set<string>();
+  const targetServiceKeys = new Set<string>();
   const onDiskCategoryFolders = new Set<string>();
 
   for (const entry of svgEntries) {
-    const onDiskFolder = entry.zipCategoryFolder;
-    onDiskCategoryFolders.add(onDiskFolder);
+    const folder = entry.zipCategoryFolder;
+    onDiskCategoryFolders.add(folder);
 
-    const targetDir = path.join(ARCH_SERVICE_DIR, onDiskFolder);
-    const targetFile = path.join(targetDir, entry.fileName);
-    targetServicePaths.add(targetFile);
+    const s3Key = `images/aws/Architecture-Service/${folder}/${entry.fileName}`;
+    targetServiceKeys.add(s3Key);
 
     const newContent = await entry.zipFile.async("nodebuffer");
-    const result = await writeIconFile(targetDir, targetFile, newContent);
+    const result = await uploadIconToS3(s3Key, newContent);
     if (result === "extracted") iconsExtracted++;
     else if (result === "updated") iconsUpdated++;
     else iconsSkipped++;
@@ -155,60 +206,17 @@ export async function POST(request: NextRequest) {
   // Orphan cleanup for service icons
   let orphansRemoved = 0;
   for (const categoryFolder of onDiskCategoryFolders) {
-    const dirPath = path.join(ARCH_SERVICE_DIR, categoryFolder);
-    let existingFiles: string[];
-    try {
-      existingFiles = await fs.readdir(dirPath);
-    } catch {
-      continue;
-    }
-    for (const fileName of existingFiles) {
-      if (!fileName.toLowerCase().endsWith(".svg")) continue;
-      const fullPath = path.join(dirPath, fileName);
-      if (!targetServicePaths.has(fullPath)) {
-        await fs.unlink(fullPath);
+    const prefix = `images/aws/Architecture-Service/${categoryFolder}/`;
+    const existingKeys = await listIcons(prefix);
+    for (const key of existingKeys) {
+      if (!targetServiceKeys.has(key)) {
+        await deleteIcon(key);
         orphansRemoved++;
       }
     }
   }
 
-  // ── 2. Category Icons ─────────────────────────────────────────────────
-
-  let categoryIconsExtracted = 0;
-  let categoryIconsSkipped = 0;
-  let categoryIconsUpdated = 0;
-
-  const catPrefix = findZipFolder(zip, "Category-Icons");
-
-  if (catPrefix) {
-    const categoryEntries: { diskName: string; zipFile: JSZip.JSZipObject }[] =
-      [];
-
-    zip.forEach((relativePath, zipEntry) => {
-      if (zipEntry.dir) return;
-      if (relativePath.startsWith("__MACOSX")) return;
-      if (!relativePath.startsWith(catPrefix)) return;
-      if (!relativePath.toLowerCase().endsWith(".svg")) return;
-
-      const fileName = relativePath.split("/").pop()!;
-      if (!fileName.includes("64")) return;
-      if (!fileName.startsWith("Arch-Category_")) return;
-
-      const diskName = categoryIconRenameMap[fileName] || fileName;
-      categoryEntries.push({ diskName, zipFile: zipEntry });
-    });
-
-    for (const entry of categoryEntries) {
-      const targetFile = path.join(CATEGORY_DIR, entry.diskName);
-      const newContent = await entry.zipFile.async("nodebuffer");
-      const result = await writeIconFile(CATEGORY_DIR, targetFile, newContent);
-      if (result === "extracted") categoryIconsExtracted++;
-      else if (result === "updated") categoryIconsUpdated++;
-      else categoryIconsSkipped++;
-    }
-  }
-
-  // ── 3. Architecture-Group Icons ───────────────────────────────────────
+  // ── 4. Architecture-Group Icons ───────────────────────────────────────
 
   let groupIconsExtracted = 0;
 
@@ -228,40 +236,53 @@ export async function POST(request: NextRequest) {
     });
 
     for (const entry of groupEntries) {
-      const targetFile = path.join(ARCH_GROUP_DIR, entry.fileName);
+      const s3Key = `images/aws/Architecture-Group/${entry.fileName}`;
       const newContent = await entry.zipFile.async("nodebuffer");
-      const result = await writeIconFile(
-        ARCH_GROUP_DIR,
-        targetFile,
-        newContent
-      );
+      const result = await uploadIconToS3(s3Key, newContent);
       if (result === "extracted") groupIconsExtracted++;
     }
   }
 
-  // ── 4. DB record creation for service icons ───────────────────────────
+  // ── 5. DB record creation for service icons ───────────────────────────
 
   const allServices = await ServicesDb.getAllServices();
-  const existingIconPaths = new Set(allServices.map((s) => s.iconPath));
+  const targetIconPaths = new Set(
+    svgEntries.map(
+      (e) =>
+        `/images/aws/Architecture-Service/${e.zipCategoryFolder}/${e.fileName}`
+    )
+  );
+
+  let staleServicesDeleted = 0;
+  for (const svc of allServices) {
+    if (!targetIconPaths.has(svc.iconPath)) {
+      await ServicesDb.deleteService(svc.id);
+      staleServicesDeleted++;
+    }
+  }
+
+  const remainingServices = allServices.filter((s) =>
+    targetIconPaths.has(s.iconPath)
+  );
+  const existingIconPaths = new Set(remainingServices.map((s) => s.iconPath));
 
   let servicesCreated = 0;
   let servicesSkipped = 0;
 
   for (const entry of svgEntries) {
-    const onDiskFolder = entry.zipCategoryFolder;
-    const relativeIconPath = `/aws/Architecture-Service/${onDiskFolder}/${entry.fileName}`;
+    const folder = entry.zipCategoryFolder;
+    const iconPath = `/images/aws/Architecture-Service/${folder}/${entry.fileName}`;
 
-    if (existingIconPaths.has(relativeIconPath)) {
+    if (existingIconPaths.has(iconPath)) {
       servicesSkipped++;
       continue;
     }
 
-    const record = buildServiceRecord(entry.fileName, onDiskFolder);
-    if (!record) {
-      servicesSkipped++;
-      continue;
-    }
-
+    const record = buildServiceRecord(
+      entry.fileName,
+      folder,
+      entry.categoryId
+    );
     await ServicesDb.createService(record);
     servicesCreated++;
   }
@@ -280,8 +301,10 @@ export async function POST(request: NextRequest) {
       categoryIconsSkipped,
       categoryIconsUpdated,
       groupIconsExtracted,
+      categoriesUpserted,
       servicesCreated,
       servicesSkipped,
+      staleServicesDeleted,
     },
   });
 }

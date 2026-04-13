@@ -7,6 +7,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { AwsService } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { resolveImageUrl } from "@/lib/image-url";
 import { useAuth } from "@/contexts/auth-context";
 
 interface ServiceCardProps {
@@ -85,7 +86,7 @@ const ServiceCardComponent = ({
           {/* Service Icon */}
           <div className={cn("relative flex-shrink-0", config.iconSize)}>
             <Image
-              src={service.iconPath}
+              src={resolveImageUrl(service.iconPath)}
               alt={service.name}
               fill
               className={cn("object-contain", isDisabled && "grayscale")}

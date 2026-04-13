@@ -3,38 +3,37 @@ import { v4 as uuidv4 } from "uuid";
 import { AwsService } from "./types";
 
 /**
- * Maps both existing on-disk folder names (public/aws/Architecture-Service/)
- * AND AWS icon zip folder names to canonical app category IDs.
+ * Derive a human-readable display name from a category id.
+ * e.g. "Application-Integration" → "Application Integration"
  */
-export const categoryMapping: Record<string, string> = {
-  Arch_Analytics: "Analytics",
-  "Arch_App-Integration": "Application-Integration",
-  "Arch_Application-Integration": "Application-Integration",
-  "Arch_Artificial-Intelligence": "Artificial-Intelligence",
-  Arch_Blockchain: "Blockchain",
-  "Arch_Business-Applications": "Business-Applications",
-  "Arch_Cloud-Financial-Management": "Cloud-Financial-Management",
-  Arch_Compute: "Compute",
-  Arch_Containers: "Containers",
-  "Arch_Customer-Enablement": "Customer-Enablement",
-  Arch_Database: "Database",
-  Arch_Databases: "Database",
-  "Arch_Developer-Tools": "Developer-Tools",
-  "Arch_End-User-Computing": "End-User-Computing",
-  "Arch_Front-End-Web-Mobile": "Front-End-Web-Mobile",
-  Arch_Games: "Games",
-  "Arch_Internet-of-Things": "Internet-of-Things",
-  "Arch_Management-Governance": "Management-Governance",
-  "Arch_Management-Tools": "Management-Governance",
-  "Arch_Media-Services": "Media-Services",
-  "Arch_Migration-Modernization": "Migration-Modernization",
-  "Arch_Networking-Content-Delivery": "Networking-Content-Delivery",
-  "Arch_Quantum-Technologies": "Quantum-Technologies",
-  Arch_Satellite: "Satellite",
-  "Arch_Security-Identity-Compliance": "Security-Identity-Compliance",
-  "Arch_Security-Identity": "Security-Identity-Compliance",
-  Arch_Storage: "Storage",
-};
+export function deriveCategoryDisplayName(categoryId: string): string {
+  return categoryId.replace(/-/g, " ");
+}
+
+/**
+ * Derive a short description from a category display name.
+ */
+export function deriveCategoryDescription(displayName: string): string {
+  return `AWS ${displayName} services`;
+}
+
+/**
+ * Extract a category id from a service folder name.
+ * e.g. "Arch_Analytics" → "Analytics", "Arch_Business-Applications" → "Business-Applications"
+ */
+export function extractCategoryIdFromFolder(folderName: string): string | null {
+  if (!folderName.startsWith("Arch_")) return null;
+  return folderName.slice("Arch_".length);
+}
+
+/**
+ * Extract a category id from a category icon filename.
+ * e.g. "Arch-Category_Analytics_64.svg" → "Analytics"
+ */
+export function extractCategoryIdFromIconFile(fileName: string): string | null {
+  const match = fileName.match(/^Arch-Category_(.+)_64\.svg$/);
+  return match ? match[1] : null;
+}
 
 export function getServiceDisplayName(fileName: string): string {
   let name = path.parse(fileName).name;
@@ -96,19 +95,16 @@ function getAwsDocsUrl(serviceName: string): string {
 }
 
 /**
- * Build a full AwsService record from a filename and category folder name,
- * exactly matching the structure produced by scripts/generate-services-data.ts.
+ * Build a full AwsService record from a filename, zip folder name, and resolved category id.
  */
 export function buildServiceRecord(
   svgFileName: string,
-  categoryFolderName: string
-): AwsService | null {
-  const categoryId = categoryMapping[categoryFolderName];
-  if (!categoryId) return null;
-
+  categoryFolderName: string,
+  categoryId: string
+): AwsService {
   const displayName = getServiceDisplayName(svgFileName);
   const slug = getServiceSlug(displayName);
-  const iconPath = `/aws/Architecture-Service/${categoryFolderName}/${svgFileName}`;
+  const iconPath = `/images/aws/Architecture-Service/${categoryFolderName}/${svgFileName}`;
   const now = new Date().toISOString();
 
   return {

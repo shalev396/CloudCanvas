@@ -1,6 +1,5 @@
 import { unstable_cache } from "next/cache";
-import { ServicesDb } from "./dynamodb";
-import { AWS_CATEGORIES } from "./categories";
+import { ServicesDb, CategoriesDb } from "./dynamodb";
 import { AwsService, ServicesByCategory } from "./types";
 
 const CACHE_TAG = "services";
@@ -15,16 +14,19 @@ export const getCachedServicesGroupedByCategory = unstable_cache(
     servicesByCategory: ServicesByCategory[];
     stats: { total: number; available: number };
   }> => {
-    const services = await ServicesDb.getServicesForDashboard();
+    const [services, categories] = await Promise.all([
+      ServicesDb.getServicesForDashboard(),
+      CategoriesDb.getAllCategories(),
+    ]);
 
     const total = services.length;
     const available = services.filter((s) => s.enabled === true).length;
 
     const servicesByCategory: ServicesByCategory[] = [];
 
-    for (const categoryConfig of AWS_CATEGORIES) {
+    for (const categoryConfig of categories) {
       const categoryServices = services.filter(
-        (service) => service.category === categoryConfig.id
+        (service) => service.category === categoryConfig.id,
       );
 
       if (categoryServices.length > 0) {
@@ -54,7 +56,7 @@ export const getCachedServicesGroupedByCategory = unstable_cache(
     return { servicesByCategory, stats: { total, available } };
   },
   ["dashboard-services"],
-  { tags: [CACHE_TAG], revalidate: CACHE_REVALIDATE_SECONDS }
+  { tags: [CACHE_TAG], revalidate: CACHE_REVALIDATE_SECONDS },
 );
 
 /**
@@ -66,7 +68,7 @@ export const getCachedServicesByCategory = unstable_cache(
     return ServicesDb.getServicesByCategory(category);
   },
   ["services-by-category"],
-  { tags: [CACHE_TAG], revalidate: CACHE_REVALIDATE_SECONDS }
+  { tags: [CACHE_TAG], revalidate: CACHE_REVALIDATE_SECONDS },
 );
 
 /**

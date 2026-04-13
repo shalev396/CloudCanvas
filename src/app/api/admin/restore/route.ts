@@ -5,20 +5,43 @@ import { ServicesDb } from "@/lib/dynamodb";
 import { SERVICES_CACHE_TAG } from "@/lib/cached-data";
 import { AwsService } from "@/lib/types";
 
-function servicesAreEqual(a: AwsService, b: AwsService): boolean {
-  const keys: (keyof AwsService)[] = [
-    "name",
-    "slug",
-    "category",
-    "summary",
-    "description",
-    "markdownContent",
-    "iconPath",
-    "enabled",
-    "awsDocsUrl",
-    "diagramUrl",
-  ];
-  return keys.every((k) => a[k] === b[k]);
+const CONTENT_KEYS: (keyof AwsService)[] = [
+  "name",
+  "slug",
+  "summary",
+  "description",
+  "markdownContent",
+  "enabled",
+  "awsDocsUrl",
+  "diagramUrl",
+];
+
+type MatchStrategy =
+  | "iconPath"
+  | "iconFilename"
+  | "slug"
+  | "name"
+  | "nameLoose";
+
+function normalizeIconPath(p: string | undefined): string {
+  if (!p) return "";
+  if (p.startsWith("/aws/") && !p.startsWith("/images/aws/")) {
+    return "/images/aws/" + p.slice("/aws/".length);
+  }
+  return p;
+}
+
+function iconFilename(p: string | undefined): string {
+  if (!p) return "";
+  return p.split("/").pop() ?? "";
+}
+
+function looseName(n: string | undefined): string {
+  return (n ?? "")
+    .toLowerCase()
+    .replace(/\baws\b/g, "")
+    .replace(/\bamazon\b/g, "")
+    .replace(/[^a-z0-9]/g, "");
 }
 
 export async function POST(request: NextRequest) {
@@ -33,47 +56,111 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json(
       { success: false, error: "Invalid JSON body" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
   if (!body.services || !Array.isArray(body.services)) {
     return NextResponse.json(
       { success: false, error: "Missing or invalid 'services' array" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
-  const backupServices = body.services;
+  const backupServices = body.services.map((s) => ({
+    ...s,
+    iconPath: normalizeIconPath(s.iconPath),
+  }));
+
   const currentServices = await ServicesDb.getAllServices();
 
-  const currentMap = new Map(currentServices.map((s) => [s.id, s]));
-  const backupMap = new Map(backupServices.map((s) => [s.id, s]));
+  // Build lookup indices on the current DB.
+  const byIconPath = new Map<string, AwsService>();
+  const byIconFilename = new Map<string, AwsService>();
+  const bySlug = new Map<string, AwsService>();
+  const byName = new Map<string, AwsService>();
+  const byLooseName = new Map<string, AwsService>();
 
-  let created = 0;
-  let updated = 0;
-  let deleted = 0;
-  let skipped = 0;
-
-  for (const service of backupServices) {
-    const existing = currentMap.get(service.id);
-    if (!existing) {
-      await ServicesDb.createService(service);
-      created++;
-    } else if (!servicesAreEqual(existing, service)) {
-      const { id, ...updates } = service;
-      await ServicesDb.updateService(id, updates);
-      updated++;
-    } else {
-      skipped++;
-    }
+  for (const s of currentServices) {
+    if (s.iconPath) byIconPath.set(s.iconPath, s);
+    const fn = iconFilename(s.iconPath);
+    if (fn) byIconFilename.set(fn, s);
+    if (s.slug) bySlug.set(s.slug.toLowerCase(), s);
+    if (s.name) byName.set(s.name.toLowerCase(), s);
+    const ln = looseName(s.name);
+    if (ln) byLooseName.set(ln, s);
   }
 
-  for (const existing of currentServices) {
-    if (!backupMap.has(existing.id)) {
-      await ServicesDb.deleteService(existing.id);
-      deleted++;
+  const usedIds = new Set<string>();
+  const matches: {
+    backup: AwsService;
+    existing: AwsService;
+    strategy: MatchStrategy;
+  }[] = [];
+  const unmatched: { name: string; iconPath: string; slug: string }[] = [];
+
+  for (const backup of backupServices) {
+    const candidates: [MatchStrategy, AwsService | undefined][] = [
+      ["iconPath", byIconPath.get(backup.iconPath)],
+      ["iconFilename", byIconFilename.get(iconFilename(backup.iconPath))],
+      ["slug", backup.slug ? bySlug.get(backup.slug.toLowerCase()) : undefined],
+      ["name", backup.name ? byName.get(backup.name.toLowerCase()) : undefined],
+      ["nameLoose", byLooseName.get(looseName(backup.name))],
+    ];
+
+    let picked: { strategy: MatchStrategy; existing: AwsService } | null = null;
+    for (const [strategy, existing] of candidates) {
+      if (existing && !usedIds.has(existing.id)) {
+        picked = { strategy, existing };
+        break;
+      }
     }
+
+    if (!picked) {
+      unmatched.push({
+        name: backup.name,
+        iconPath: backup.iconPath,
+        slug: backup.slug,
+      });
+      continue;
+    }
+
+    usedIds.add(picked.existing.id);
+    matches.push({ backup, existing: picked.existing, strategy: picked.strategy });
+  }
+
+  let updated = 0;
+  let unchanged = 0;
+  const matchedByStrategy: Record<MatchStrategy, number> = {
+    iconPath: 0,
+    iconFilename: 0,
+    slug: 0,
+    name: 0,
+    nameLoose: 0,
+  };
+
+  for (const { backup, existing, strategy } of matches) {
+    matchedByStrategy[strategy]++;
+
+    const updates: Partial<AwsService> = {};
+    let changed = false;
+    for (const k of CONTENT_KEYS) {
+      const backupVal = backup[k];
+      if (backupVal === undefined) continue;
+      if (existing[k] !== backupVal) {
+        // @ts-expect-error — indexed copy across matching keys
+        updates[k] = backupVal;
+        changed = true;
+      }
+    }
+
+    if (!changed) {
+      unchanged++;
+      continue;
+    }
+
+    await ServicesDb.updateService(existing.id, updates);
+    updated++;
   }
 
   revalidateTag(SERVICES_CACHE_TAG);
@@ -81,6 +168,14 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({
     success: true,
-    data: { created, updated, deleted, skipped },
+    data: {
+      backupCount: backupServices.length,
+      currentCount: currentServices.length,
+      updated,
+      unchanged,
+      unmatchedCount: unmatched.length,
+      unmatched,
+      matchedByStrategy,
+    },
   });
 }

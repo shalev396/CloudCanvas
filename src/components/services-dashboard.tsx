@@ -8,6 +8,7 @@ import { ServiceCard } from "@/components/service-card";
 import { Search, ChevronDown, ChevronRight } from "lucide-react";
 import Image from "next/image";
 import { ServicesByCategory } from "@/lib/types";
+import { resolveImageUrl } from "@/lib/image-url";
 
 interface ServiceStats {
   total: number;
@@ -40,15 +41,10 @@ function CategoryCard({ category, onExpand }: CategoryCardProps) {
           {/* Category Icon - Responsive */}
           <div className="relative w-12 h-12 sm:w-24 sm:h-24 flex-shrink-0 mb-2 sm:mb-4">
             <Image
-              src={category.iconPath}
+              src={resolveImageUrl(category.iconPath)}
               alt={category.displayName}
               fill
               className="object-contain"
-              onError={(e) => {
-                // Fallback for broken images
-                e.currentTarget.src =
-                  "/aws/Category/Arch-Category_Compute_64.svg";
-              }}
             />
           </div>
 
@@ -102,7 +98,7 @@ function CategoryRow({
           )}
           <div className="relative w-12 h-12 flex-shrink-0">
             <Image
-              src={category.iconPath}
+              src={resolveImageUrl(category.iconPath)}
               alt={category.displayName}
               fill
               className="object-contain"

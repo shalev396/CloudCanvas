@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { AWS_CATEGORIES } from "@/lib/categories";
+import { CategoriesDb } from "@/lib/dynamodb";
 import { AwsService } from "@/lib/types";
 import { ServicePageClient } from "@/components/service-page-client";
 import { getCachedServicesByCategory } from "@/lib/cached-data";
@@ -13,7 +13,7 @@ interface ServicePageProps {
 
 function findServiceBySlug(
   services: AwsService[],
-  slug: string
+  slug: string,
 ): AwsService | null {
   const service = services.find((s) => s.slug === slug);
   if (!service) return null;
@@ -40,7 +40,8 @@ export default async function ServicePage({ params }: ServicePageProps) {
     notFound();
   }
 
-  const categoryInfo = AWS_CATEGORIES.find((cat) => cat.id === category);
+  const allCategories = await CategoriesDb.getAllCategories();
+  const categoryInfo = allCategories.find((cat) => cat.id === category);
 
   if (!categoryInfo) {
     notFound();

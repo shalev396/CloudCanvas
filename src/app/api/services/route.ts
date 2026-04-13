@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ServicesDb } from "@/lib/dynamodb";
-import { AWS_CATEGORIES } from "@/lib/categories";
+import { ServicesDb, CategoriesDb } from "@/lib/dynamodb";
 import { ServicesByCategory } from "@/lib/types";
 
 export async function GET(request: NextRequest) {
@@ -20,19 +19,20 @@ export async function GET(request: NextRequest) {
           headers: {
             "Cache-Control": "public, s-maxage=60, stale-while-revalidate=30",
           },
-        }
+        },
       );
     }
 
-    // Return all services grouped by category for dashboard
-    const services = await ServicesDb.getServicesForDashboard();
+    const [services, categories] = await Promise.all([
+      ServicesDb.getServicesForDashboard(),
+      CategoriesDb.getAllCategories(),
+    ]);
 
-    // Group services by category
     const servicesByCategory: ServicesByCategory[] = [];
 
-    for (const categoryConfig of AWS_CATEGORIES) {
+    for (const categoryConfig of categories) {
       const categoryServices = services.filter(
-        (service) => service.category === categoryConfig.id
+        (service) => service.category === categoryConfig.id,
       );
 
       if (categoryServices.length > 0) {
@@ -68,13 +68,13 @@ export async function GET(request: NextRequest) {
         headers: {
           "Cache-Control": "public, s-maxage=60, stale-while-revalidate=30",
         },
-      }
+      },
     );
   } catch (error) {
     console.error("Error fetching services:", error);
     return NextResponse.json(
       { success: false, error: "Failed to fetch services" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

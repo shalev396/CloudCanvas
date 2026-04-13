@@ -1,103 +1,76 @@
-# API Routes Documentation
+# API Routes
 
-## Authentication Routes
+All routes live under `src/app/api/`. Auth is JWT (Bearer) via `authenticateRequest()` / `requireAdmin()` in `src/lib/middleware.ts`.
 
-### POST /api/auth/login
+## Authentication
 
-**Purpose**: Authenticate user and return JWT token
-**Authentication**: None required
-**Body**: `{ email: string, password: string }`
-**Response**: `{ success: boolean, data?: { token: string, user: object }, error?: string }`
+### `POST /api/auth/login`
 
-### POST /api/auth/logout
+- **Auth**: none
+- **Body**: `{ email, password }`
+- **Response**: `{ success, data?: { token, user }, error? }`
 
-**Purpose**: Logout endpoint (client-side token removal)
-**Authentication**: None required
-**Response**: `{ success: boolean, message: string }`
+### `POST /api/auth/register`
 
-## Service Routes
+- **Auth**: none (gated by `REGISTRATION_ENABLED` feature flag)
+- **Body**: `{ email, name, password }`
+- **Response**: `{ success, data?: { token, user }, error? }`
 
-### GET /api/services
+### `POST /api/auth/logout`
 
-**Purpose**: Get all services grouped by category OR get services for a specific category
-**Authentication**: None required
-**Query Parameters**:
+- **Auth**: none (client-side token removal)
+- **Response**: `{ success, message }`
 
-- `category` (optional): Filter by specific category
-  **Response**:
-- Without category: `{ success: boolean, data: ServicesByCategory[] }`
-- With category: `{ success: boolean, data: AwsService[] }`
+## Services
 
-### GET /api/services/id/[id]
+### `GET /api/services`
 
-**Purpose**: Get a single service by its ID
-**Authentication**: None required
-**Parameters**: `id` - service ID
-**Response**: `{ success: boolean, data?: AwsService, error?: string }`
+- **Auth**: none
+- **Query**: `category` (optional) — filter to a single category
+- **Response**:
+  - Without `category`: `{ success, data: ServicesByCategory[] }`
+  - With `category`: `{ success, data: AwsService[] }`
+- Backed by `cached-data.ts` (`unstable_cache`, 300s TTL, tag-based revalidation).
 
-### PUT /api/services/id/[id]
+### `GET /api/services/id/[id]`
 
-**Purpose**: Update a service by its ID
-**Authentication**: Admin required
-**Parameters**: `id` - service ID
-**Body**: Service update data
-**Response**: `{ success: boolean, data?: AwsService, error?: string }`
+- **Auth**: none
+- **Response**: `{ success, data?: AwsService, error? }`
 
-## Route Analysis
+### `PUT /api/services/id/[id]`
 
-### Route Consolidation
+- **Auth**: Admin
+- **Body**: partial `AwsService` update (includes `markdownContent`)
+- **Response**: `{ success, data?: AwsService, error? }`
+- Calls `revalidatePath()` after update.
 
-- ✅ **Removed**: `/api/services/[slug]` routes (unused)
-- ✅ **Kept**: `/api/services/id/[id]` routes (actively used by client)
-- **Rationale**: ID-based routes are more direct and don't require slug lookup
+### `GET /api/services/stats`
 
-### Current Usage Patterns
+- **Auth**: none
+- **Response**: `{ success, data: { totalServices, availableServices } }`
 
-- **Service Page Rendering**: Uses API call to `/api/services?category=X` then filters by slug
-- **Service Updates**: Uses PUT to `/api/services/id/[id]`
-- **Individual Service Fetch**: Falls back to direct DB query if API fails
+## Admin
 
-### Issues Identified & Root Cause Analysis
+All admin routes require a valid JWT with `isAdmin: true`.
 
-#### Primary Issue: Server Component Self-Fetching
+### `GET /api/admin/backup`
 
-The service page (`[category]/[service]/page.tsx`) makes HTTP requests to its own API routes in server components, which causes several problems:
+Export all services as JSON for download.
 
-1. **Base URL Construction Fails in Production**:
+### `POST /api/admin/restore`
 
-   - Development: `http://localhost:3000` ✅
-   - Production: Relies on `process.env.VERCEL_URL` which may be undefined → empty string → fetch fails
+Upload a backup JSON. Diffs against the current DB and creates/updates/deletes services to match. Handles icon path migration (`/aws/` → `/images/aws/`).
 
-2. **Next.js App Router Caching**:
+### `POST /api/admin/seed-icons`
 
-   - Server components are aggressively cached
-   - No revalidation strategy after updates
-   - Stale data served on refresh
+Upload the AWS Architecture Icons ZIP. Extracts 64px SVGs, uploads to S3, and creates service + category rows (new services default to `enabled: false`).
 
-3. **Inconsistent Data Flow**:
-   - **Save**: `PUT /api/services/id/{id}` (updates by ID)
-   - **Fetch**: `GET /api/services?category={category}` + slug filtering
-   - **Problem**: Cache invalidation doesn't affect the category-based fetch
+### `POST /api/admin/clear`
 
-#### When User Edits & Saves:
+Delete all services from DynamoDB.
 
-1. Client calls `PUT /api/services/id/{id}` ✅ (works fine)
-2. User refreshes page
-3. Server component calls `GET /api/services?category={category}`
-4. In production: baseUrl is empty → fetch fails → falls back to direct DB ❌
-5. OR: fetch succeeds but cache is stale ❌
+## Conventions
 
-#### Solution Strategy:
-
-1. ✅ Remove HTTP self-fetching in server components
-2. ✅ Use direct database calls in server components
-3. ✅ Add proper cache revalidation
-4. ✅ Consolidate duplicate routes
-
-#### Implemented Fixes:
-
-1. **Server Component Fix**: Replaced HTTP self-fetching with direct `ServicesDb.getServicesByCategory()` calls
-2. **Cache Revalidation**: Added `revalidatePath()` calls after service updates + `revalidate = 60` export
-3. **Route Cleanup**: Removed unused `/api/services/[slug]` routes
-4. **Cache Headers**: Added appropriate `Cache-Control` headers to API responses
-5. **Production Stability**: Eliminated problematic base URL construction that failed in production
+- Responses follow `{ success: boolean, data?: T, error?: string }`.
+- Read endpoints set `Cache-Control` headers; mutations call `revalidatePath()` / `revalidateTag()`.
+- Server components call `ServicesDb` directly — they do not HTTP-fetch internal API routes.
