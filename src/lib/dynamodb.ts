@@ -10,6 +10,7 @@ import {
   BatchWriteCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { AwsService, User, CategoryConfig } from "./types";
+import { getAwsCredentials } from "./aws-credentials";
 
 if (!process.env.AWS_REGION) {
   throw new Error("AWS_REGION environment variable is required");
@@ -26,6 +27,7 @@ if (!process.env.CATEGORIES_TABLE_NAME) {
 
 const client = new DynamoDBClient({
   region: process.env.AWS_REGION!,
+  credentials: getAwsCredentials(),
 });
 
 type ScanInput = ConstructorParameters<typeof ScanCommand>[0];

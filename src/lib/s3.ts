@@ -6,6 +6,7 @@ import {
   DeleteObjectsCommand,
   ListObjectsV2Command,
 } from "@aws-sdk/client-s3";
+import { getAwsCredentials } from "./aws-credentials";
 
 function getS3Client(): S3Client {
   if (!process.env.AWS_REGION) {
@@ -13,6 +14,7 @@ function getS3Client(): S3Client {
   }
   return new S3Client({
     region: process.env.AWS_REGION,
+    credentials: getAwsCredentials(),
   });
 }
 
