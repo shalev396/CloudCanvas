@@ -209,6 +209,13 @@ Resources:
               OriginProtocolPolicy: https-only
               OriginSSLProtocols:
                 - TLSv1.2
+            # Route every origin fetch through a single AWS region so Vercel
+            # sees a stable, us-east-1 source IP instead of whichever POP
+            # CloudFront picks. Works around Vercel anti-abuse behavior that
+            # was dropping requests for the dev/qa subdomains from some POPs.
+            OriginShield:
+              Enabled: true
+              OriginShieldRegion: us-east-1
 
         DefaultCacheBehavior:
           TargetOriginId: VercelApp
