@@ -1,0 +1,20 @@
+# PR to main: lint, build, then run tests against the live QA URL
+name: PR to Main
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  lint-build:
+    name: Lint & Build
+    uses: ./.github/workflows/_lint-build.yml
+
+  test:
+    name: Test
+    needs: lint-build
+    uses: ./.github/workflows/_test-qa.yml
+    secrets: inherit

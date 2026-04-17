@@ -3,12 +3,16 @@ import { config } from "dotenv";
 import { resolve } from "path";
 
 const stage = process.argv[2];
-if (!stage || !["dev", "prod"].includes(stage)) {
-  console.error("Usage: node scripts/deploy.mjs <dev|prod>");
+if (!stage || !["dev", "qa", "prod"].includes(stage)) {
+  console.error("Usage: node scripts/deploy.mjs <dev|qa|prod>");
   process.exit(1);
 }
 
-const envFile = stage === "prod" ? ".env.production" : ".env.development";
+const envFile = {
+  dev: ".env.development",
+  qa: ".env.qa",
+  prod: ".env.production",
+}[stage];
 config({ path: resolve(process.cwd(), envFile) });
 
 const required = [

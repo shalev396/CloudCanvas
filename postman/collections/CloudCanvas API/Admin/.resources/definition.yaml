@@ -1,0 +1,4 @@
+$kind: collection
+name: Admin
+description: Admin gating + backup. Destructive endpoints (clear, restore) intentionally not exercised.
+order: 4000

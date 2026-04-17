@@ -1,50 +1,31 @@
-name: Deploy Infrastructure
+# Reusable workflow: Deploy CloudFormation stack for a stage.
+# Vercel deploys the frontend automatically on push (branch-to-domain mapping).
+# This workflow only handles the AWS infra side.
+name: Deploy
 
 on:
-  push:
-    branches: [main, dev]
-    paths:
-      - cloudformation.yml
-  workflow_dispatch:
+  workflow_call:
     inputs:
       stage:
-        description: "Deployment stage"
+        description: 'Deployment stage (dev, qa, prod)'
         required: true
-        default: prod
-        type: choice
-        options:
-          - dev
-          - prod
+        type: string
 
 permissions:
   id-token: write
   contents: read
 
 jobs:
-  resolve-stage:
+  deploy-cfn:
+    name: Deploy CloudFormation (${{ inputs.stage }})
     runs-on: ubuntu-latest
-    outputs:
-      stage: ${{ steps.pick.outputs.stage }}
+    environment:
+      name: ${{ inputs.stage }}
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
     steps:
-      - id: pick
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "stage=${{ inputs.stage }}" >> "$GITHUB_OUTPUT"
-          elif [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            echo "stage=prod" >> "$GITHUB_OUTPUT"
-          else
-            echo "stage=dev" >> "$GITHUB_OUTPUT"
-          fi
-
-  deploy:
-    needs: resolve-stage
-    name: Deploy CloudFormation (${{ needs.resolve-stage.outputs.stage }})
-    runs-on: ubuntu-latest
-    environment: ${{ needs.resolve-stage.outputs.stage }}
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -53,16 +34,14 @@ jobs:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/my-github-actions-role
 
       - name: Deploy CloudFormation stack
-        env:
-          STAGE: ${{ needs.resolve-stage.outputs.stage }}
         run: |
           aws cloudformation deploy \
             --template-file cloudformation.yml \
-            --stack-name "cloudcanvas-${STAGE}" \
+            --stack-name "cloudcanvas-${{ inputs.stage }}" \
             --capabilities CAPABILITY_NAMED_IAM \
             --no-fail-on-empty-changeset \
             --parameter-overrides \
-              Stage="${STAGE}" \
+              Stage=${{ inputs.stage }} \
               VercelDomain="${{ secrets.VERCEL_DOMAIN }}" \
               CustomDomain="${{ secrets.CUSTOM_DOMAIN }}" \
               ACMCertificateArn="${{ secrets.ACM_CERTIFICATE_ARN }}" \
@@ -76,10 +55,33 @@ jobs:
               CategoriesTableName="${{ secrets.CATEGORIES_TABLE_NAME }}"
 
       - name: Print stack status
-        env:
-          STAGE: ${{ needs.resolve-stage.outputs.stage }}
         run: |
           aws cloudformation describe-stacks \
-            --stack-name "cloudcanvas-${STAGE}" \
+            --stack-name "cloudcanvas-${{ inputs.stage }}" \
             --query "Stacks[0].StackStatus" \
             --output text
+
+  wait-for-vercel:
+    name: Wait for Vercel ${{ inputs.stage }} deploy
+    runs-on: ubuntu-latest
+    needs: deploy-cfn
+    environment:
+      name: ${{ inputs.stage }}
+    steps:
+      - name: Poll until healthy
+        env:
+          BASE_URL: https://${{ secrets.CUSTOM_DOMAIN }}
+        run: |
+          # Vercel deploys async on push; give it time then poll.
+          sleep 30
+          for i in $(seq 1 48); do
+            code=$(curl -fsS -o /dev/null -w "%{http_code}" "$BASE_URL/api/services/stats" || echo "000")
+            if [ "$code" = "200" ]; then
+              echo "${{ inputs.stage }} healthy after $i attempts"
+              exit 0
+            fi
+            echo "attempt $i: HTTP $code, sleeping 10s"
+            sleep 10
+          done
+          echo "${{ inputs.stage }} never became healthy"
+          exit 1

@@ -1,0 +1,4 @@
+$kind: collection
+name: Setup
+description: Wipe users, seed admin, login. Runs first.
+order: 1000

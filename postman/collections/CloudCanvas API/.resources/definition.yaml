@@ -1,0 +1,20 @@
+$kind: collection
+name: CloudCanvas API
+description: >-
+  CloudCanvas API tests. Setup: resets users, seeds test admin, logs in.
+  Auth: login, register-disabled. Services: read endpoints. Admin: backup/clear gating.
+variables:
+  baseUrl: http://localhost:3000/api
+  testAdminEmail: qa-admin@cloudcanvas.test
+  testAdminPassword: qa-admin-password-1234
+  idToken: ''
+  testServiceId: ''
+  testServiceCategory: ''
+  testServiceSlug: ''
+auth:
+  - id: 383fc78f-96ef-47d9-81d5-e4c7dada7326
+    type: bearer
+    name: API Token
+    description: JWT from /auth/login (saved to {{idToken}})
+    credentials:
+      token: '{{idToken}}'

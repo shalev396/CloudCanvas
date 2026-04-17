@@ -1,0 +1,39 @@
+# Reusable workflow: Lint, typecheck, build the Next.js app
+name: Lint & Build
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  lint-build:
+    name: Lint & Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Build
+        env:
+          # Module-load checks in src/lib/auth-server.ts and src/lib/dynamodb.ts
+          # require these to be present at build time — never used at runtime here.
+          JWT_SECRET: ci-build-placeholder-not-a-real-secret
+          AWS_REGION: us-east-1
+          SERVICES_TABLE_NAME: ci-services
+          USERS_TABLE_NAME: ci-users
+          CATEGORIES_TABLE_NAME: ci-categories
+        run: npm run build

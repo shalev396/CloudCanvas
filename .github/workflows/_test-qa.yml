@@ -1,0 +1,84 @@
+# Reusable workflow: Run Postman + Playwright against the LIVE QA URL.
+# No AWS credentials needed — pure HTTP. Tests run sequentially.
+# Both jobs upload their reports to ./artifacts/ for download.
+name: Test QA
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  test-backend-qa:
+    name: Backend Tests (Postman vs QA)
+    runs-on: ubuntu-latest
+    environment:
+      name: qa
+    env:
+      BASE_URL: https://${{ secrets.CUSTOM_DOMAIN }}
+      API_BASE_URL: https://${{ secrets.CUSTOM_DOMAIN }}/api
+      TEST_ADMIN_EMAIL: ${{ secrets.TEST_ADMIN_EMAIL }}
+      TEST_ADMIN_PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD }}
+      SKIP_PLAYWRIGHT_INSTALL: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run Postman against QA
+        run: |
+          npx postman collection run "./postman/collections/CloudCanvas API" \
+            --environment "./postman/environments/CloudCanvas QA.environment.yaml" \
+            --env-var "baseUrl=https://${{ secrets.CUSTOM_DOMAIN }}/api" \
+            --env-var "testAdminEmail=${{ secrets.TEST_ADMIN_EMAIL }}" \
+            --env-var "testAdminPassword=${{ secrets.TEST_ADMIN_PASSWORD }}"
+
+  test-frontend-qa:
+    name: Frontend Tests (Playwright vs QA)
+    runs-on: ubuntu-latest
+    needs: test-backend-qa
+    environment:
+      name: qa
+    env:
+      BASE_URL: https://${{ secrets.CUSTOM_DOMAIN }}
+      API_BASE_URL: https://${{ secrets.CUSTOM_DOMAIN }}/api
+      TEST_ADMIN_EMAIL: ${{ secrets.TEST_ADMIN_EMAIL }}
+      TEST_ADMIN_PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Wait for QA to be healthy
+        run: |
+          for i in $(seq 1 30); do
+            code=$(curl -fsS -o /dev/null -w "%{http_code}" "$API_BASE_URL/services/stats" || echo "000")
+            if [ "$code" = "200" ]; then
+              echo "QA healthy after $i attempts"
+              exit 0
+            fi
+            echo "attempt $i: HTTP $code, sleeping 10s"
+            sleep 10
+          done
+          echo "QA never became healthy"
+          exit 1
+
+      - name: Run Playwright against QA
+        run: npx playwright test
+
+      - name: Upload Playwright artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-qa
+          path: artifacts/
+          retention-days: 7

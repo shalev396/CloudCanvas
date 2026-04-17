@@ -246,6 +246,25 @@ export class UsersDb {
     return (result.Items?.[0] as User) || null;
   }
 
+  static async clearAllUsers(): Promise<number> {
+    const users = await scanAll<User>({ TableName: TABLES.USERS });
+    const batchSize = 25;
+    for (let i = 0; i < users.length; i += batchSize) {
+      const batch = users.slice(i, i + batchSize);
+      const deleteRequests = batch.map((u) => ({
+        DeleteRequest: { Key: { id: u.id } },
+      }));
+      if (deleteRequests.length > 0) {
+        await dynamodb.send(
+          new BatchWriteCommand({
+            RequestItems: { [TABLES.USERS]: deleteRequests },
+          })
+        );
+      }
+    }
+    return users.length;
+  }
+
   static async updateUserFavorites(
     userId: string,
     favorites: string[]

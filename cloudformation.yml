@@ -4,7 +4,7 @@ Description: CloudCanvas infrastructure - DynamoDB, S3, CloudFront, IAM (Vercel 
 Parameters:
   Stage:
     Type: String
-    AllowedValues: [dev, prod]
+    AllowedValues: [dev, qa, prod]
     Description: Deployment stage
 
   VercelDomain:

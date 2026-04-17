@@ -1,0 +1,40 @@
+# Unified push workflow — fires on dev, qa, main.
+# Maps the branch name to a stage (dev → dev, qa → qa, main → prod),
+# lints + builds, then calls _deploy.yml for that stage.
+name: Push
+
+on:
+  push:
+    branches: [dev, qa, main]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  resolve:
+    name: Resolve stage
+    runs-on: ubuntu-latest
+    outputs:
+      stage: ${{ steps.map.outputs.stage }}
+    steps:
+      - id: map
+        run: |
+          case "${{ github.ref_name }}" in
+            main) echo "stage=prod" >> "$GITHUB_OUTPUT" ;;
+            qa)   echo "stage=qa"   >> "$GITHUB_OUTPUT" ;;
+            dev)  echo "stage=dev"  >> "$GITHUB_OUTPUT" ;;
+            *)    echo "Unknown branch ${{ github.ref_name }}" && exit 1 ;;
+          esac
+
+  lint-build:
+    name: Lint & Build
+    uses: ./.github/workflows/_lint-build.yml
+
+  deploy:
+    name: Deploy
+    needs: [resolve, lint-build]
+    uses: ./.github/workflows/_deploy.yml
+    secrets: inherit
+    with:
+      stage: ${{ needs.resolve.outputs.stage }}

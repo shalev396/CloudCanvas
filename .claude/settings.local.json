@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:vercel.com)",
+      "Bash(npm install:*)",
+      "Bash(xargs grep:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run:*)",
+      "Bash(curl *)",
+      "Bash(npm view *)",
+      "Bash(npx postman *)",
+      "Bash(npx playwright *)",
+      "Bash(postman collection *)"
+    ]
+  }
+}
