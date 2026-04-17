@@ -6,6 +6,13 @@ name: Push
 on:
   push:
     branches: [dev, qa, main]
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to deploy (dev, qa, main)'
+        required: true
+        type: choice
+        options: [dev, qa, main]
 
 permissions:
   id-token: write
@@ -20,11 +27,12 @@ jobs:
     steps:
       - id: map
         run: |
-          case "${{ github.ref_name }}" in
+          branch="${{ inputs.branch || github.ref_name }}"
+          case "$branch" in
             main) echo "stage=prod" >> "$GITHUB_OUTPUT" ;;
             qa)   echo "stage=qa"   >> "$GITHUB_OUTPUT" ;;
             dev)  echo "stage=dev"  >> "$GITHUB_OUTPUT" ;;
-            *)    echo "Unknown branch ${{ github.ref_name }}" && exit 1 ;;
+            *)    echo "Unknown branch $branch" && exit 1 ;;
           esac
 
   lint-build:
