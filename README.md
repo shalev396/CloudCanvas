@@ -1,6 +1,6 @@
 # 🎨 CloudCanvas
 
-**Interactive Cloud Service Explorer**
+**Interactive Cloud Service Explorer.**
 
 I needed a way to learn cloud services for the AWS Cloud Practitioner exam and really hated traditional notes because they're unorganized. So I built my own interactive learning platform for cloud services.
 
