@@ -7,33 +7,24 @@ Run these against a local Next.js dev server or the live QA API. API tests use t
 ## Import
 
 1. **Collection**: Import `postman/collections/CloudCanvas API` (V3 folder format).
-2. **Environments**: Import `postman/environments/CloudCanvas Local.environment.yaml` and `postman/environments/CloudCanvas QA.environment.yaml`.
+2. **Environment**: Import `postman/environments/CloudCanvas Local.environment.yaml`.
+
+Tests always target `http://localhost:3000/api`; which stage's DynamoDB tables back the server is determined by the `npm run dev | qa | prod` command you started in the other terminal, not by a separate Postman env.
 
 ## What to Change Before Running
 
-### 1. Environment — Base URL
+### 1. Admin Credentials
 
-| File | Variable | Template value | Change to |
-| --- | --- | --- | --- |
-| `postman/environments/CloudCanvas QA.environment.yaml` | `baseUrl` | `https://qa.cloudcanvas.shalev396.com/api` | `https://qa.yourdomain.com/api` |
+The collection logs in as a preset admin. Defaults in the Local env file:
 
-For the active environment, `baseUrl` should be:
-
-- **Local**: `http://localhost:3000/api` (run `npm run dev` from repo root first)
-- **QA**: Your QA API URL, e.g. `https://qa.yourdomain.com/api`
-
-### 2. Admin Credentials
-
-The collection logs in as a preset admin. Set these in the environment (or via `--env-var` on the CLI):
-
-| Variable | Purpose |
+| Variable | Default |
 | --- | --- |
-| `testAdminEmail` | Admin email (Local defaults to `qa-admin@cloudcanvas.test`) |
-| `testAdminPassword` | Admin password (Local defaults to `qa-admin-password-1234`) |
+| `testAdminEmail` | `qa-admin@cloudcanvas.test` |
+| `testAdminPassword` | `qa-admin-password-1234` |
 
-For QA, both are blank in the committed env file — inject them from CI secrets (see `.github/workflows/_test-local.yml`).
+These match `tests/config.ts` and the admin seeded by `POST /api/dev/reset` during global setup. Override per-run with `--env-var` if you need different credentials.
 
-### 3. Tokens
+### 2. Tokens
 
 `idToken` is set automatically by **Setup / 2. Login** — leave it blank. If you run individual requests out of order, re-run Setup first or paste a token manually.
 
@@ -42,18 +33,17 @@ For QA, both are blank in the committed env file — inject them from CI secrets
 From repo root:
 
 ```bash
-npm run test:api:dev   # Against http://localhost:3000/api (uses Local env file)
-npm run test:api:qa    # Against QA baseUrl from CloudCanvas QA.environment.yaml
+npm run test:api:dev   # Loads .env.development (runs against localhost)
+npm run test:api:qa    # Loads .env.qa         (runs against localhost)
 ```
 
-CI overrides `baseUrl` and admin creds per-run via `--env-var`:
+Both hit `http://localhost:3000/api`. Start the matching Next.js server first:
 
 ```bash
-npx postman collection run "./postman/collections/CloudCanvas API" \
-  --environment "./postman/environments/CloudCanvas QA.environment.yaml" \
-  --env-var "baseUrl=https://qa.yourdomain.com/api" \
-  --env-var "testAdminEmail=..." \
-  --env-var "testAdminPassword=..."
+# one terminal
+npm run qa
+# another terminal
+npm run test:api:qa
 ```
 
 ## Collection Structure

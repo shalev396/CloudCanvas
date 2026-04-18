@@ -15,7 +15,7 @@ scripts:
       const email = pm.collectionVariables.get('testAdminEmail') || pm.environment.get('testAdminEmail');
       const password = pm.collectionVariables.get('testAdminPassword') || pm.environment.get('testAdminPassword');
       pm.request.body.raw = JSON.stringify({
-        scope: 'users',
+        scope: 'all',
         admin: { email, password, name: 'QA Test Admin' },
         seedTestService: true,
       });

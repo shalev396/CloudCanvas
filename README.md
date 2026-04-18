@@ -44,9 +44,9 @@ AWS credentials resolve from `~/.aws/credentials` locally. Fill `.env.developmen
 ### Run Locally
 
 ```bash
-npm run dev    # Dev server — uses .env.development
-npm run qa     # Build + start against .env.qa (requires dotenv-cli, bundled)
-npm run prod   # Build + start against .env.production
+npm run dev    # Hot-reload dev server against .env.development
+npm run qa     # Hot-reload dev server against .env.qa
+npm run prod   # Hot-reload dev server against .env.production
 ```
 
 ### Deploy Infrastructure
@@ -75,17 +75,25 @@ Out of the box:
 
 ```bash
 npm install            # Installs deps + Playwright Chromium (via postinstall)
-npm run test:react:dev # Run all E2E tests vs local dev server
-npm run test:react:qa  # Run all E2E tests vs QA (reads .env.qa)
-npm run test:api:dev   # Run Postman collection vs local dev server
-npm run test:api:qa    # Run Postman collection vs QA (reads .env.qa)
+
+# In one terminal: start the Next.js server against a stage's env
+npm run dev            # .env.development → cloudcanvas-*-dev tables
+npm run qa             # .env.qa         → cloudcanvas-*-qa tables
+
+# In another terminal: run the combined Postman + Playwright suite
+npm run test:dev       # loads .env.development
+npm run test:qa        # loads .env.qa
+
+# Or run just one half
+npm run test:api:dev   # Postman only
+npm run test:react:qa  # Playwright only
 ```
 
 Full env-file setup and CI artifact download steps in [SETUP.md](SETUP.md).
 
 Failing Playwright tests write screenshots, videos, and traces to `artifacts/` plus a full HTML report at `artifacts/report/index.html`. CI uploads the whole folder on any outcome.
 
-PRs to `qa` run tests against a local Next.js server backed by QA's DynamoDB. PRs to `main` run tests against the live QA URL.
+PRs to `qa` run tests against a local Next.js server backed by dev's DynamoDB. PRs to `main` run tests against a local Next.js server backed by qa's DynamoDB.
 
 ## 📚 Open Source for Cloud Practitioner Prep
 

@@ -15,7 +15,7 @@ export default async function globalSetup() {
   try {
     const res = await ctx.post(`${API_BASE_URL}/dev/reset`, {
       data: {
-        scope: "users",
+        scope: "all",
         admin: {
           email: TEST_ADMIN_EMAIL,
           password: TEST_ADMIN_PASSWORD,
