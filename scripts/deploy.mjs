@@ -20,13 +20,13 @@ const alwaysRequired = [
   "SERVICES_TABLE_NAME",
   "USERS_TABLE_NAME",
   "CATEGORIES_TABLE_NAME",
+  "CUSTOM_DOMAIN",
+  "ACM_CERTIFICATE_ARN",
+  "HOSTED_ZONE_ID",
 ];
 
 const prodOnlyRequired = [
   "VERCEL_DOMAIN",
-  "CUSTOM_DOMAIN",
-  "ACM_CERTIFICATE_ARN",
-  "HOSTED_ZONE_ID",
   "VERCEL_TEAM_SLUG",
   "VERCEL_PROJECT_NAME",
   "VERCEL_OIDC_PROVIDER_ARN",
@@ -47,14 +47,14 @@ const params = [
   `ServicesTableName=${process.env.SERVICES_TABLE_NAME}`,
   `UsersTableName=${process.env.USERS_TABLE_NAME}`,
   `CategoriesTableName=${process.env.CATEGORIES_TABLE_NAME}`,
+  `CustomDomain=${process.env.CUSTOM_DOMAIN}`,
+  `ACMCertificateArn=${process.env.ACM_CERTIFICATE_ARN}`,
+  `HostedZoneId=${process.env.HOSTED_ZONE_ID}`,
 ];
 
 if (stage === "prod") {
   params.push(
     `VercelDomain=${process.env.VERCEL_DOMAIN}`,
-    `CustomDomain=${process.env.CUSTOM_DOMAIN}`,
-    `ACMCertificateArn=${process.env.ACM_CERTIFICATE_ARN}`,
-    `HostedZoneId=${process.env.HOSTED_ZONE_ID}`,
     `VercelTeamSlug=${process.env.VERCEL_TEAM_SLUG}`,
     `VercelProjectName=${process.env.VERCEL_PROJECT_NAME}`,
     `VercelOIDCProviderArn=${process.env.VERCEL_OIDC_PROVIDER_ARN}`,

@@ -7,28 +7,22 @@ Parameters:
     AllowedValues: [dev, qa, prod]
     Description: Deployment stage
 
-  # ─── Prod-only (CloudFront + Route53 + Vercel IAM role) ─────────────
-  # Empty defaults so non-prod deploys can omit them.
+  CustomDomain:
+    Type: String
+    Description: Custom domain for this stage's CloudFront distribution
+
+  ACMCertificateArn:
+    Type: String
+    Description: ACM certificate ARN in us-east-1 covering CustomDomain
+
+  HostedZoneId:
+    Type: AWS::Route53::HostedZone::Id
+    Description: Route53 hosted zone ID for the parent domain
 
   VercelDomain:
     Type: String
     Default: ""
     Description: Vercel default project domain (prod only)
-
-  CustomDomain:
-    Type: String
-    Default: ""
-    Description: Custom domain for the site (prod only)
-
-  ACMCertificateArn:
-    Type: String
-    Default: ""
-    Description: ACM certificate ARN in us-east-1 (prod only)
-
-  HostedZoneId:
-    Type: String
-    Default: ""
-    Description: Route53 hosted zone ID (prod only)
 
   VercelTeamSlug:
     Type: String
@@ -200,27 +194,18 @@ Resources:
         SigningBehavior: always
         SigningProtocol: sigv4
 
-  # Deployed in every stage so `/images/*` can be served via CloudFront → S3.
-  # In prod, also routes everything else to Vercel (Verified Proxy Lite).
-  # In dev/qa, the distribution only serves images — non-image paths fall back
-  # to the S3 origin (which 403s), since the app itself is served direct from
-  # Vercel's own domain in those stages.
   CloudFrontDistribution:
     Type: AWS::CloudFront::Distribution
     Properties:
       DistributionConfig:
         Enabled: true
         Comment: !Sub "CloudCanvas ${Stage}"
-        Aliases: !If
-          - IsProd
-          - - !Ref CustomDomain
-          - !Ref AWS::NoValue
-        ViewerCertificate: !If
-          - IsProd
-          - AcmCertificateArn: !Ref ACMCertificateArn
-            SslSupportMethod: sni-only
-            MinimumProtocolVersion: TLSv1.2_2021
-          - CloudFrontDefaultCertificate: true
+        Aliases:
+          - !Ref CustomDomain
+        ViewerCertificate:
+          AcmCertificateArn: !Ref ACMCertificateArn
+          SslSupportMethod: sni-only
+          MinimumProtocolVersion: TLSv1.2_2021
         HttpVersion: http2and3
         DefaultRootObject: ""
 
@@ -283,7 +268,6 @@ Resources:
 
   CloudFrontDnsRecord:
     Type: AWS::Route53::RecordSet
-    Condition: IsProd
     Properties:
       HostedZoneId: !Ref HostedZoneId
       Name: !Ref CustomDomain
@@ -296,7 +280,6 @@ Resources:
 
   CloudFrontDnsRecordAAAA:
     Type: AWS::Route53::RecordSet
-    Condition: IsProd
     Properties:
       HostedZoneId: !Ref HostedZoneId
       Name: !Ref CustomDomain
