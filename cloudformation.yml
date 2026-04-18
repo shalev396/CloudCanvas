@@ -204,6 +204,8 @@ Resources:
 
           - Id: VercelApp
             DomainName: !Ref VercelDomain
+            OriginShield:
+              Enabled: false
             CustomOriginConfig:
               HTTPSPort: 443
               OriginProtocolPolicy: https-only
@@ -216,13 +218,9 @@ Resources:
           AllowedMethods: [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]
           CachedMethods: [GET, HEAD]
           CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad  # CachingDisabled
-          # AllViewerAndCloudFrontHeaders-2022-06 — forwards AllViewer's
-          # headers PLUS CloudFront-generated ones. Required so the
-          # `CloudFront-Viewer-Address` header reaches Vercel and enables
-          # Verified Proxy Lite (Hobby/Pro); without it, Vercel's firewall
-          # silently blocks CloudFront traffic.
-          # https://vercel.com/docs/security/reverse-proxy
-          OriginRequestPolicyId: 33f36d7e-f396-46d9-90e0-52428a34d9dc
+          # AllViewer managed policy — forwards all viewer headers (incl. Host)
+          # to Vercel. Matches prod's working configuration.
+          OriginRequestPolicyId: 216adef6-5c7f-47e4-b989-5492eafa07d3
           Compress: true
 
         CacheBehaviors:
