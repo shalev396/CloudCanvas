@@ -174,7 +174,6 @@ Resources:
 
   ImagesBucketPolicy:
     Type: AWS::S3::BucketPolicy
-    Condition: IsProd
     Properties:
       Bucket: !Ref ImagesBucket
       PolicyDocument:
@@ -194,7 +193,6 @@ Resources:
 
   CloudFrontOAC:
     Type: AWS::CloudFront::OriginAccessControl
-    Condition: IsProd
     Properties:
       OriginAccessControlConfig:
         Name: !Sub "cloudcanvas-oac-${Stage}"
@@ -202,49 +200,69 @@ Resources:
         SigningBehavior: always
         SigningProtocol: sigv4
 
+  # Deployed in every stage so `/images/*` can be served via CloudFront → S3.
+  # In prod, also routes everything else to Vercel (Verified Proxy Lite).
+  # In dev/qa, the distribution only serves images — non-image paths fall back
+  # to the S3 origin (which 403s), since the app itself is served direct from
+  # Vercel's own domain in those stages.
   CloudFrontDistribution:
     Type: AWS::CloudFront::Distribution
-    Condition: IsProd
     Properties:
       DistributionConfig:
         Enabled: true
         Comment: !Sub "CloudCanvas ${Stage}"
-        Aliases:
-          - !Ref CustomDomain
-        ViewerCertificate:
-          AcmCertificateArn: !Ref ACMCertificateArn
-          SslSupportMethod: sni-only
-          MinimumProtocolVersion: TLSv1.2_2021
+        Aliases: !If
+          - IsProd
+          - - !Ref CustomDomain
+          - !Ref AWS::NoValue
+        ViewerCertificate: !If
+          - IsProd
+          - AcmCertificateArn: !Ref ACMCertificateArn
+            SslSupportMethod: sni-only
+            MinimumProtocolVersion: TLSv1.2_2021
+          - CloudFrontDefaultCertificate: true
         HttpVersion: http2and3
         DefaultRootObject: ""
 
-        Origins:
-          - Id: S3Images
-            DomainName: !GetAtt ImagesBucket.RegionalDomainName
-            OriginAccessControlId: !Ref CloudFrontOAC
-            S3OriginConfig:
-              OriginAccessIdentity: ""
+        Origins: !If
+          - IsProd
+          - - Id: S3Images
+              DomainName: !GetAtt ImagesBucket.RegionalDomainName
+              OriginAccessControlId: !Ref CloudFrontOAC
+              S3OriginConfig:
+                OriginAccessIdentity: ""
+            - Id: VercelApp
+              DomainName: !Ref VercelDomain
+              OriginShield:
+                Enabled: false
+              CustomOriginConfig:
+                HTTPSPort: 443
+                OriginProtocolPolicy: https-only
+                OriginSSLProtocols:
+                  - TLSv1.2
+          - - Id: S3Images
+              DomainName: !GetAtt ImagesBucket.RegionalDomainName
+              OriginAccessControlId: !Ref CloudFrontOAC
+              S3OriginConfig:
+                OriginAccessIdentity: ""
 
-          - Id: VercelApp
-            DomainName: !Ref VercelDomain
-            OriginShield:
-              Enabled: false
-            CustomOriginConfig:
-              HTTPSPort: 443
-              OriginProtocolPolicy: https-only
-              OriginSSLProtocols:
-                - TLSv1.2
-
-        DefaultCacheBehavior:
-          TargetOriginId: VercelApp
-          ViewerProtocolPolicy: redirect-to-https
-          AllowedMethods: [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]
-          CachedMethods: [GET, HEAD]
-          CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad  # CachingDisabled
-          # AllViewer managed policy — forwards all viewer headers (incl. Host)
-          # to Vercel. Matches prod's working configuration.
-          OriginRequestPolicyId: 216adef6-5c7f-47e4-b989-5492eafa07d3
-          Compress: true
+        DefaultCacheBehavior: !If
+          - IsProd
+          - TargetOriginId: VercelApp
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods: [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]
+            CachedMethods: [GET, HEAD]
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad  # CachingDisabled
+            # AllViewer managed policy — forwards all viewer headers (incl. Host)
+            # to Vercel. Matches prod's working configuration.
+            OriginRequestPolicyId: 216adef6-5c7f-47e4-b989-5492eafa07d3
+            Compress: true
+          - TargetOriginId: S3Images
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods: [GET, HEAD]
+            CachedMethods: [GET, HEAD]
+            CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6  # CachingOptimized
+            Compress: true
 
         CacheBehaviors:
           - PathPattern: "/images/*"
@@ -374,12 +392,10 @@ Outputs:
     Value: !Ref ImagesBucket
 
   CloudFrontDomain:
-    Condition: IsProd
     Description: CloudFront distribution domain (point your DNS CNAME here)
     Value: !GetAtt CloudFrontDistribution.DomainName
 
   CloudFrontDistributionId:
-    Condition: IsProd
     Description: CloudFront distribution ID
     Value: !Ref CloudFrontDistribution
 
