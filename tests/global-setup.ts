@@ -21,6 +21,7 @@ export default async function globalSetup() {
           password: TEST_ADMIN_PASSWORD,
           name: "QA Test Admin",
         },
+        seedTestService: true,
       },
     });
     if (res.status() === 403) {
@@ -36,7 +37,7 @@ export default async function globalSetup() {
     }
     const body = await res.json();
     console.log(
-      `[global-setup] reset ok — deletedUsers=${body.data?.deletedUsers}, admin=${body.data?.createdAdmin?.email}`
+      `[global-setup] reset ok — deletedUsers=${body.data?.deletedUsers}, admin=${body.data?.createdAdmin?.email}, seededService=${body.data?.seededService?.id ?? "none"}`
     );
   } finally {
     await ctx.dispose();

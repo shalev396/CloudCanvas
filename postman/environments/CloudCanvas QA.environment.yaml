@@ -7,17 +7,11 @@ values:
       content: QA API base URL
       type: text/plain
   - key: testAdminEmail
-    value: ''
+    value: qa-admin@cloudcanvas.test
     enabled: true
-    description:
-      content: Override per env in CI via --env-var "testAdminEmail=..."
-      type: text/plain
   - key: testAdminPassword
-    value: ''
+    value: qa-admin-password-1234
     enabled: true
-    description:
-      content: Override per env in CI via --env-var "testAdminPassword=..."
-      type: text/plain
   - key: idToken
     value: ''
     enabled: true
