@@ -11,7 +11,9 @@
       "Bash(npm view *)",
       "Bash(npx postman *)",
       "Bash(npx playwright *)",
-      "Bash(postman *)"
+      "Bash(postman *)",
+      "WebFetch(domain:vercel.com)",
+      "WebFetch(domain:github.com)"
     ]
   }
 }
