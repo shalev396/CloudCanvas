@@ -11,15 +11,20 @@ All infrastructure is managed via `cloudformation.yml` (DynamoDB, S3, CloudFront
 ## Commands
 
 ```bash
-npm run dev              # Local dev server (Turbopack)
-npm run prod             # local prod server (Turbopack)
+npm run dev              # Hot-reload Next.js with .env.development
+npm run qa               # Hot-reload Next.js with .env.qa
+npm run prod             # Hot-reload Next.js with .env.production
 npm run build            # Production build (Turbopack)
+npm run start            # Serve production build
 npm run lint             # ESLint
 npm run deploy:dev       # Deploy CloudFormation stack (dev)
+npm run deploy:qa        # Deploy CloudFormation stack (qa)
 npm run deploy:prod      # Deploy CloudFormation stack (prod)
+npm run test:dev         # Run Postman + Playwright against a `npm run dev` server
+npm run test:qa          # Run Postman + Playwright against a `npm run qa` server
 ```
 
-No test framework is configured.
+Tests run against `http://localhost:3000`. Start `npm run <stage>` in one terminal, `npm run test:<stage>` in another. CI uses the same commands — see `.github/workflows/_test-local.yml`.
 
 ## Architecture
 

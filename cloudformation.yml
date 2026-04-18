@@ -209,6 +209,11 @@ Resources:
         HttpVersion: http2and3
         DefaultRootObject: ""
 
+        # Prod fronts the Vercel app through CloudFront (default behavior →
+        # Vercel, /images/* → S3). Dev/qa intentionally omit the Vercel origin:
+        # Vercel's firewall on newer projects blocks CloudFront egress IPs, so
+        # the app is reached via its Vercel preview URL directly and CloudFront
+        # on the stage's CustomDomain only serves the image CDN.
         Origins: !If
           - IsProd
           - - Id: S3Images

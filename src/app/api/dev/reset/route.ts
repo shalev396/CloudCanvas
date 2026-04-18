@@ -1,13 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { randomUUID } from "crypto";
 import { BatchOperations, CategoriesDb, ServicesDb, UsersDb } from "@/lib/dynamodb";
 import { AuthUtils } from "@/lib/auth-server";
-import { User } from "@/lib/types";
+import { SERVICES_CACHE_TAG } from "@/lib/cached-data";
+import { AwsService, CategoryConfig, User } from "@/lib/types";
 
 type ResetBody = {
   scope?: "users" | "all";
   admin?: { email: string; password: string; name?: string };
+  seedTestService?: boolean;
 };
+
+// Deterministic fixture. iconPath points at Next.js's app/favicon.ico, which is
+// always served at /favicon.ico with an image/* content-type, so the Playwright
+// icons smoke test resolves cleanly without any S3 / CloudFront dependency.
+const TEST_CATEGORY_ID = "qa-test-category";
+const TEST_SERVICE_ID = "qa-test-service";
+const TEST_ICON_PATH = "/favicon.ico";
 
 export async function POST(request: NextRequest) {
   const env = process.env.ENV;
@@ -55,6 +65,42 @@ export async function POST(request: NextRequest) {
       createdAdmin = { id: user.id, email: user.email };
     }
 
+    let seededService: { id: string; category: string } | null = null;
+    if (body.seedTestService) {
+      const now = new Date().toISOString();
+      const category: CategoryConfig = {
+        id: TEST_CATEGORY_ID,
+        name: TEST_CATEGORY_ID,
+        displayName: "QA Test Category",
+        iconPath: TEST_ICON_PATH,
+        description: "Seeded by /api/dev/reset for E2E tests",
+        enabled: true,
+      };
+      const service: AwsService = {
+        id: TEST_SERVICE_ID,
+        name: "QA Test Service",
+        slug: "qa-test-service",
+        category: TEST_CATEGORY_ID,
+        summary: "Deterministic fixture for Postman/Playwright tests",
+        description: "Seeded by /api/dev/reset — wiped on every run.",
+        markdownContent:
+          "## Overview\n\nFixture service seeded by /api/dev/reset.\n",
+        awsDocsUrl: "",
+        diagramUrl: "",
+        iconPath: TEST_ICON_PATH,
+        enabled: true,
+        createdAt: now,
+        updatedAt: now,
+      };
+      await CategoriesDb.upsertCategory(category);
+      await ServicesDb.createService(service);
+      seededService = { id: service.id, category: service.category };
+    }
+
+    // Bust Next.js's in-memory cache so subsequent requests see the fresh
+    // fixture instead of stale data from a previous run.
+    revalidateTag(SERVICES_CACHE_TAG);
+
     return NextResponse.json({
       success: true,
       data: {
@@ -65,6 +111,7 @@ export async function POST(request: NextRequest) {
         deletedServices,
         deletedCategories,
         createdAdmin,
+        seededService,
         message: `Reset complete (scope=${scope})`,
       },
     });

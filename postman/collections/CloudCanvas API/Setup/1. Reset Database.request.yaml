@@ -15,8 +15,9 @@ scripts:
       const email = pm.collectionVariables.get('testAdminEmail') || pm.environment.get('testAdminEmail');
       const password = pm.collectionVariables.get('testAdminPassword') || pm.environment.get('testAdminPassword');
       pm.request.body.raw = JSON.stringify({
-        scope: 'users',
+        scope: 'all',
         admin: { email, password, name: 'QA Test Admin' },
+        seedTestService: true,
       });
     language: text/javascript
   - type: afterResponse
@@ -31,6 +32,10 @@ scripts:
       pm.test('Test admin was created', function () {
           const json = pm.response.json();
           pm.expect(json.data.createdAdmin).to.have.property('email');
+      });
+      pm.test('Test service was seeded', function () {
+          const json = pm.response.json();
+          pm.expect(json.data.seededService).to.have.property('id');
       });
     language: text/javascript
 order: 1000

@@ -16,29 +16,35 @@ npm install
 
 That's it — Chromium downloads automatically via `postinstall`. No separate `test:install` step. See [SETUP.md](../SETUP.md) for env-file setup.
 
-**Before every local dev test run**, start the Next.js server in a separate terminal:
+**Before every local test run**, start the Next.js server in a separate terminal using the stage you want to test:
 
 ```bash
-npm run dev      # http://localhost:3000
+npm run dev   # .env.development → cloudcanvas-*-dev
+npm run qa    # .env.qa         → cloudcanvas-*-qa
+npm run prod  # .env.production → cloudcanvas-*-prod (hot reload; not a production bundle)
 ```
 
-The server talks to real DynamoDB tables (local dev uses `~/.aws/credentials` against `cloudcanvas-*-dev`).
+All three serve at `http://localhost:3000` — only the backing DynamoDB tables differ.
 
-**Run tests** (from repo root):
+**Run tests** (from repo root, against whichever stage's server you started):
 
 ```bash
-npm run test:react:dev   # vs local dev server (localhost:3000)
-npm run test:react:qa    # vs QA URL from .env.qa
-```
+npm run test:dev   # Postman + Playwright, loads .env.development
+npm run test:qa    # Postman + Playwright, loads .env.qa
 
-`test:react:dev` uses `BASE_URL=http://localhost:3000` and `API_BASE_URL=http://localhost:3000/api` by default. `test:react:qa` loads `.env.qa` via `dotenv-cli`, so make sure that file sets `BASE_URL` and optionally `API_BASE_URL` (see [SETUP.md](../SETUP.md#2-env-files)).
+# Just one half
+npm run test:react:dev
+npm run test:api:qa
+```
 
 ## Scripts
 
 | Script | What it does |
 | --- | --- |
-| `npm run test:react:dev` | Run all E2E tests against the local dev server |
-| `npm run test:react:qa` | Run all E2E tests against QA — loads URL + creds from `.env.qa` |
+| `npm run test:dev` | Full suite (Postman + Playwright) against a `npm run dev` server |
+| `npm run test:qa` | Full suite against a `npm run qa` server |
+| `npm run test:react:dev` / `test:react:qa` | Playwright only |
+| `npm run test:api:dev` / `test:api:qa` | Postman only |
 | `npm run seed:test-admin` | Manually seed the QA test admin (only if `/api/dev/reset` is unavailable) |
 
 ### URLs and Environment Variables
