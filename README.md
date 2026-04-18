@@ -1,6 +1,6 @@
 # 🎨 CloudCanvas
 
-**Interactive Cloud Service Explorer**
+**Interactive Cloud Service Explorer.**
 
 I needed a way to learn cloud services for the AWS Cloud Practitioner exam and really hated traditional notes because they're unorganized. So I built my own interactive learning platform for cloud services.
 
@@ -28,34 +28,64 @@ I needed a way to learn cloud services for the AWS Cloud Practitioner exam and r
 ## 📦 Installation
 
 ```bash
-# Clone the repository
 git clone https://github.com/shalev396/CloudCanvas.git
 cd CloudCanvas
-
-# Install dependencies
 npm install
-
-# Setup environment variables
-cp .env.template .env.development
-
-# Start development
+cp .env.template .env.development   # fill in values — see SETUP.md
 npm run dev
 ```
 
+`npm install` also downloads the Playwright Chromium browser (via `postinstall`) so the test suite is ready to run without a separate install step. For the full env-file setup for dev, QA, and prod, see [**SETUP.md**](SETUP.md).
+
 ### Environment Setup
 
-Create `.env.development` (AWS credentials resolve from `~/.aws/credentials` locally):
+AWS credentials resolve from `~/.aws/credentials` locally. Fill `.env.development` / `.env.qa` / `.env.production` per [SETUP.md](SETUP.md#2-env-files).
+
+### Run Locally
+
+```bash
+npm run dev    # Dev server — uses .env.development
+npm run qa     # Build + start against .env.qa (requires dotenv-cli, bundled)
+npm run prod   # Build + start against .env.production
+```
 
 ### Deploy Infrastructure
 
 ```bash
 npm run deploy:dev    # Deploy CloudFormation stack (dev)
+npm run deploy:qa     # Deploy CloudFormation stack (qa)
 npm run deploy:prod   # Deploy CloudFormation stack (prod)
 ```
 
 ## 🎯 Usage
 
 This is your personal interactive notebook for cloud services, categorized and grouped by AWS service categories. Perfect for Cloud Practitioner exam preparation or general cloud learning.
+
+## 🧪 Tests
+
+Out of the box:
+
+- **Frontend E2E** — Playwright (smoke, accessibility, visual, responsive, security, flows)
+- **Backend API** — Postman (auth, services, admin)
+
+| Doc | Description |
+| --- | --- |
+| [Frontend tests](tests/README.md) | Run commands, global setup, page × category matrix, artifacts |
+| [Backend tests](postman/README.md) | Collection structure, CLI commands, auth model |
+
+```bash
+npm install            # Installs deps + Playwright Chromium (via postinstall)
+npm run test:react:dev # Run all E2E tests vs local dev server
+npm run test:react:qa  # Run all E2E tests vs QA (reads .env.qa)
+npm run test:api:dev   # Run Postman collection vs local dev server
+npm run test:api:qa    # Run Postman collection vs QA (reads .env.qa)
+```
+
+Full env-file setup and CI artifact download steps in [SETUP.md](SETUP.md).
+
+Failing Playwright tests write screenshots, videos, and traces to `artifacts/` plus a full HTML report at `artifacts/report/index.html`. CI uploads the whole folder on any outcome.
+
+PRs to `qa` run tests against a local Next.js server backed by QA's DynamoDB. PRs to `main` run tests against the live QA URL.
 
 ## 📚 Open Source for Cloud Practitioner Prep
 

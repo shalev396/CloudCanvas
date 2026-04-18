@@ -1,0 +1,37 @@
+$kind: http-request
+name: Get Services (saves first enabled service to vars)
+url: '{{baseUrl}}/services'
+method: GET
+auth:
+  type: noauth
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('Status code is 200', function () {
+          pm.response.to.have.status(200);
+      });
+      const json = pm.response.json();
+      pm.test('Has data array', function () {
+          pm.expect(json).to.have.property('success', true);
+          pm.expect(Array.isArray(json.data)).to.be.true;
+      });
+      const groups = json.data || [];
+      let picked = null;
+      for (const g of groups) {
+          const enabled = (g.services || []).find(s => s.enabled);
+          if (enabled) { picked = enabled; break; }
+      }
+      if (picked) {
+          pm.collectionVariables.set('testServiceId', picked.id);
+          pm.collectionVariables.set('testServiceCategory', picked.category);
+          pm.collectionVariables.set('testServiceSlug', picked.slug);
+          pm.environment.set('testServiceId', picked.id);
+          pm.environment.set('testServiceCategory', picked.category);
+          pm.environment.set('testServiceSlug', picked.slug);
+          console.log(`Picked service: ${picked.name} (${picked.id})`);
+      }
+      pm.test('Found at least one enabled service', function () {
+          pm.expect(picked, 'no enabled service in environment').to.not.be.null;
+      });
+    language: text/javascript
+order: 1000

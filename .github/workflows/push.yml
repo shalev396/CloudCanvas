@@ -1,0 +1,47 @@
+# Unified push workflow — fires on dev, qa, main.
+# Maps the branch name to a stage (dev → dev, qa → qa, main → prod),
+# lints + builds, then calls _deploy.yml. All stages deploy DynamoDB + S3 +
+# CloudFront + Route53; the Vercel OIDC IAM role is prod-only (see
+# cloudformation.yml conditions).
+name: Push
+
+on:
+  push:
+    branches: [dev, qa, main]
+  # For manual runs, use GitHub's "Run workflow" branch selector — it sets
+  # github.ref_name and also controls which ref is checked out by the called
+  # workflows, so code + stage always match.
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  resolve:
+    name: Resolve stage
+    runs-on: ubuntu-latest
+    outputs:
+      stage: ${{ steps.map.outputs.stage }}
+    steps:
+      - id: map
+        run: |
+          branch="${{ github.ref_name }}"
+          case "$branch" in
+            main) echo "stage=prod" >> "$GITHUB_OUTPUT" ;;
+            qa)   echo "stage=qa"   >> "$GITHUB_OUTPUT" ;;
+            dev)  echo "stage=dev"  >> "$GITHUB_OUTPUT" ;;
+            *)    echo "Unknown branch $branch" && exit 1 ;;
+          esac
+
+  lint-build:
+    name: Lint & Build
+    uses: ./.github/workflows/_lint-build.yml
+
+  deploy:
+    name: Deploy
+    needs: [resolve, lint-build]
+    uses: ./.github/workflows/_deploy.yml
+    secrets: inherit
+    with:
+      stage: ${{ needs.resolve.outputs.stage }}

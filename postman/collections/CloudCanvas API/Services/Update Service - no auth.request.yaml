@@ -1,0 +1,19 @@
+$kind: http-request
+name: Update Service - no auth (401)
+url: '{{baseUrl}}/services/id/{{testServiceId}}'
+method: PUT
+auth:
+  type: noauth
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: '{"name":"hacked"}'
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('Unauthenticated update is rejected (401 or 403)', function () {
+          pm.expect([401, 403]).to.include(pm.response.code);
+      });
+    language: text/javascript
+order: 4000

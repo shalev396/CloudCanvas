@@ -1,0 +1,25 @@
+# PR to main: lint, build, then start `npm run qa`-equivalent locally (build
+# + start, using qa AWS resources) and run Postman + Playwright against it.
+name: PR to Main
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  lint-build:
+    name: Lint & Build
+    uses: ./.github/workflows/_lint-build.yml
+
+  test:
+    name: Test
+    needs: lint-build
+    uses: ./.github/workflows/_test-local.yml
+    secrets: inherit
+    with:
+      environment: qa
+      mode: qa

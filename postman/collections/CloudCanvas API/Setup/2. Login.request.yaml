@@ -1,0 +1,36 @@
+$kind: http-request
+name: Login (saves idToken)
+url: '{{baseUrl}}/auth/login'
+method: POST
+auth:
+  type: noauth
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: '{}'
+scripts:
+  - type: beforeRequest
+    code: |-
+      const email = pm.collectionVariables.get('testAdminEmail') || pm.environment.get('testAdminEmail');
+      const password = pm.collectionVariables.get('testAdminPassword') || pm.environment.get('testAdminPassword');
+      pm.request.body.raw = JSON.stringify({ email, password });
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      const json = pm.response.json();
+      if (pm.response.code === 200 && json.data && json.data.token) {
+          pm.collectionVariables.set('idToken', json.data.token);
+          pm.environment.set('idToken', json.data.token);
+          console.log('idToken saved for authenticated requests');
+      }
+      pm.test('Status code is 200', function () {
+          pm.response.to.have.status(200);
+      });
+      pm.test('Response has token and user', function () {
+          pm.expect(json.data).to.have.property('token');
+          pm.expect(json.data.user).to.have.property('email');
+          pm.expect(json.data.user).to.have.property('isAdmin', true);
+      });
+    language: text/javascript
+order: 2000

@@ -1,0 +1,14 @@
+$kind: http-request
+name: Backup - no auth (401/403)
+url: '{{baseUrl}}/admin/backup'
+method: GET
+auth:
+  type: noauth
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('Unauthenticated backup is rejected', function () {
+          pm.expect([401, 403]).to.include(pm.response.code);
+      });
+    language: text/javascript
+order: 1000

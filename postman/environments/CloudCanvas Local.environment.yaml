@@ -1,0 +1,33 @@
+name: CloudCanvas Local
+values:
+  - key: baseUrl
+    value: 'http://localhost:3000/api'
+    enabled: true
+    description:
+      content: Local Next.js dev server (npm run dev)
+      type: text/plain
+  - key: testAdminEmail
+    value: qa-admin@cloudcanvas.test
+    enabled: true
+  - key: testAdminPassword
+    value: qa-admin-password-1234
+    enabled: true
+  - key: idToken
+    value: ''
+    enabled: true
+    description:
+      content: Set by Setup/2. Login - leave empty
+      type: text/plain
+  - key: testServiceId
+    value: ''
+    enabled: true
+    description:
+      content: Set by Services/Get Services - leave empty
+      type: text/plain
+  - key: testServiceCategory
+    value: ''
+    enabled: true
+  - key: testServiceSlug
+    value: ''
+    enabled: true
+color: 0

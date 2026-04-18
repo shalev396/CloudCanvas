@@ -1,0 +1,4 @@
+$kind: collection
+name: Services
+description: Read endpoints for services data.
+order: 3000

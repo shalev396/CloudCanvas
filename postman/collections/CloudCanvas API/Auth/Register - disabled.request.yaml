@@ -1,0 +1,23 @@
+$kind: http-request
+name: Register - disabled (always 403)
+url: '{{baseUrl}}/auth/register'
+method: POST
+auth:
+  type: noauth
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: '{"email":"newuser@cloudcanvas.test","name":"New User","password":"passw0rd1"}'
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('Status code is 403', function () {
+          pm.response.to.have.status(403);
+      });
+      pm.test('Returns Registration is disabled', function () {
+          const json = pm.response.json();
+          pm.expect(json.error).to.equal('Registration is disabled');
+      });
+    language: text/javascript
+order: 2000

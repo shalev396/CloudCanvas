@@ -1,0 +1,14 @@
+$kind: http-request
+name: Clear - no auth (must be rejected)
+url: '{{baseUrl}}/admin/clear'
+method: POST
+auth:
+  type: noauth
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('Unauthenticated clear is rejected (401 or 403)', function () {
+          pm.expect([401, 403]).to.include(pm.response.code);
+      });
+    language: text/javascript
+order: 3000

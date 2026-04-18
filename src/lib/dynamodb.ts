@@ -49,6 +49,33 @@ async function scanAll<T>(input: ScanInput): Promise<T[]> {
 
 const dynamodb = DynamoDBDocumentClient.from(client);
 
+// BatchWriteItem can silently drop up to 25 items per call when DynamoDB
+// throttles — they come back in UnprocessedItems. Retry with exponential
+// backoff until the set is empty or we give up.
+type WriteRequest =
+  | { DeleteRequest: { Key: Record<string, unknown> } }
+  | { PutRequest: { Item: Record<string, unknown> } };
+async function batchWriteWithRetry(
+  tableName: string,
+  requests: WriteRequest[],
+  maxRetries = 5
+): Promise<void> {
+  let remaining: WriteRequest[] = requests;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    if (remaining.length === 0) return;
+    const res = await dynamodb.send(
+      new BatchWriteCommand({ RequestItems: { [tableName]: remaining } })
+    );
+    remaining = (res.UnprocessedItems?.[tableName] ?? []) as WriteRequest[];
+    if (remaining.length === 0) return;
+    // 100ms, 200ms, 400ms, 800ms, 1600ms
+    await new Promise((r) => setTimeout(r, 100 * 2 ** attempt));
+  }
+  throw new Error(
+    `BatchWrite to ${tableName} left ${remaining.length} unprocessed items after ${maxRetries} retries`
+  );
+}
+
 export const TABLES = {
   SERVICES: process.env.SERVICES_TABLE_NAME,
   USERS: process.env.USERS_TABLE_NAME,
@@ -246,6 +273,21 @@ export class UsersDb {
     return (result.Items?.[0] as User) || null;
   }
 
+  static async clearAllUsers(): Promise<number> {
+    const users = await scanAll<User>({ TableName: TABLES.USERS });
+    const batchSize = 25;
+    for (let i = 0; i < users.length; i += batchSize) {
+      const batch = users.slice(i, i + batchSize);
+      const deleteRequests = batch.map((u) => ({
+        DeleteRequest: { Key: { id: u.id } },
+      }));
+      if (deleteRequests.length > 0) {
+        await batchWriteWithRetry(TABLES.USERS!, deleteRequests);
+      }
+    }
+    return users.length;
+  }
+
   static async updateUserFavorites(
     userId: string,
     favorites: string[]
@@ -330,13 +372,7 @@ export class CategoriesDb {
         DeleteRequest: { Key: { id: cat.id } },
       }));
       if (deleteRequests.length > 0) {
-        await dynamodb.send(
-          new BatchWriteCommand({
-            RequestItems: {
-              [TABLES.CATEGORIES]: deleteRequests,
-            },
-          })
-        );
+        await batchWriteWithRetry(TABLES.CATEGORIES!, deleteRequests);
       }
     }
   }
@@ -352,17 +388,11 @@ export class BatchOperations {
 
       const writeRequests = batch.map((service) => ({
         PutRequest: {
-          Item: service,
+          Item: service as unknown as Record<string, unknown>,
         },
       }));
 
-      await dynamodb.send(
-        new BatchWriteCommand({
-          RequestItems: {
-            [TABLES.SERVICES]: writeRequests,
-          },
-        })
-      );
+      await batchWriteWithRetry(TABLES.SERVICES!, writeRequests);
     }
   }
 
@@ -380,13 +410,7 @@ export class BatchOperations {
       }));
 
       if (deleteRequests.length > 0) {
-        await dynamodb.send(
-          new BatchWriteCommand({
-            RequestItems: {
-              [TABLES.SERVICES]: deleteRequests,
-            },
-          })
-        );
+        await batchWriteWithRetry(TABLES.SERVICES!, deleteRequests);
       }
     }
   }

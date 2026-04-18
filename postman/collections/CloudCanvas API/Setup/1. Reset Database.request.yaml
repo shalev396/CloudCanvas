@@ -1,0 +1,36 @@
+$kind: http-request
+name: Reset Database
+url: '{{baseUrl}}/dev/reset'
+method: POST
+auth:
+  type: noauth
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: '{}'
+scripts:
+  - type: beforeRequest
+    code: |-
+      const email = pm.collectionVariables.get('testAdminEmail') || pm.environment.get('testAdminEmail');
+      const password = pm.collectionVariables.get('testAdminPassword') || pm.environment.get('testAdminPassword');
+      pm.request.body.raw = JSON.stringify({
+        scope: 'users',
+        admin: { email, password, name: 'QA Test Admin' },
+      });
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      pm.test('Status code is 200', function () {
+          pm.response.to.have.status(200);
+      });
+      pm.test('Response provider is dynamodb', function () {
+          const json = pm.response.json();
+          pm.expect(json.data).to.have.property('provider', 'dynamodb');
+      });
+      pm.test('Test admin was created', function () {
+          const json = pm.response.json();
+          pm.expect(json.data.createdAdmin).to.have.property('email');
+      });
+    language: text/javascript
+order: 1000

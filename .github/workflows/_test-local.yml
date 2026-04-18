@@ -1,0 +1,143 @@
+# Reusable workflow: start Next.js locally and run Postman + Playwright.
+# `mode=dev` runs `npm run dev`. `mode=qa` runs `next build && next start`
+# (equivalent to `npm run qa`, without dotenv since env comes from GH env).
+# `environment` selects which GitHub environment's AWS secrets back the server.
+name: Test Local
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: 'GitHub environment for AWS secrets (dev or qa)'
+        required: false
+        type: string
+        default: qa
+      mode:
+        description: 'Server mode: dev (next dev) or qa (next build + next start)'
+        required: false
+        type: string
+        default: dev
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  test-backend:
+    name: Backend Tests (Postman)
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      SERVICES_TABLE_NAME: ${{ secrets.SERVICES_TABLE_NAME }}
+      USERS_TABLE_NAME: ${{ secrets.USERS_TABLE_NAME }}
+      CATEGORIES_TABLE_NAME: ${{ secrets.CATEGORIES_TABLE_NAME }}
+      S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
+      ENV: ${{ inputs.environment }}
+      SKIP_PLAYWRIGHT_INSTALL: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ vars.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/my-github-actions-role
+
+      - run: npm ci
+
+      - name: Start Next.js (${{ inputs.mode }}) and run Postman
+        run: |
+          if [ "${{ inputs.mode }}" = "qa" ]; then
+            npx next build --turbopack
+            npx next start &
+          else
+            npm run dev &
+          fi
+          SERVER_PID=$!
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 http://localhost:3000/api/services/stats 2>/dev/null || echo "000")
+            if [ "$code" = "200" ]; then
+              echo "Next.js ready on port 3000"
+              npm run test:api:dev
+              TEST_EXIT=$?
+              kill $SERVER_PID 2>/dev/null || true
+              exit $TEST_EXIT
+            fi
+            sleep 2
+          done
+          echo "Next.js failed to start"
+          kill $SERVER_PID 2>/dev/null || true
+          exit 1
+
+  test-frontend:
+    name: Frontend Tests (Playwright)
+    runs-on: ubuntu-latest
+    needs: test-backend
+    environment:
+      name: ${{ inputs.environment }}
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      SERVICES_TABLE_NAME: ${{ secrets.SERVICES_TABLE_NAME }}
+      USERS_TABLE_NAME: ${{ secrets.USERS_TABLE_NAME }}
+      CATEGORIES_TABLE_NAME: ${{ secrets.CATEGORIES_TABLE_NAME }}
+      S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
+      ENV: ${{ inputs.environment }}
+      BASE_URL: http://localhost:3000
+      API_BASE_URL: http://localhost:3000/api
+      CUSTOM_DOMAIN: ${{ secrets.CUSTOM_DOMAIN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ vars.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/my-github-actions-role
+
+      - run: npm ci
+
+      - name: Start Next.js (${{ inputs.mode }}) and run Playwright
+        run: |
+          if [ "${{ inputs.mode }}" = "qa" ]; then
+            npx next build --turbopack
+            npx next start &
+          else
+            npm run dev &
+          fi
+          SERVER_PID=$!
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 http://localhost:3000/api/services/stats 2>/dev/null || echo "000")
+            if [ "$code" = "200" ]; then
+              echo "Next.js ready on port 3000"
+              npm run test:react:dev
+              TEST_EXIT=$?
+              kill $SERVER_PID 2>/dev/null || true
+              exit $TEST_EXIT
+            fi
+            sleep 2
+          done
+          echo "Next.js failed to start"
+          kill $SERVER_PID 2>/dev/null || true
+          exit 1
+
+      - name: Upload Playwright artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-local
+          path: artifacts/
+          retention-days: 7
