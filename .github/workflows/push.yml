@@ -1,6 +1,7 @@
 # Unified push workflow — fires on dev, qa, main.
 # Maps the branch name to a stage (dev → dev, qa → qa, main → prod),
-# lints + builds, then calls _deploy.yml for that stage.
+# lints + builds, then calls _deploy.yml. Dev/qa stacks only deploy
+# DynamoDB + S3 (CloudFormation conditions); prod deploys everything.
 name: Push
 
 on:

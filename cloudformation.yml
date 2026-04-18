@@ -7,33 +7,45 @@ Parameters:
     AllowedValues: [dev, qa, prod]
     Description: Deployment stage
 
+  # ─── Prod-only (CloudFront + Route53 + Vercel IAM role) ─────────────
+  # Empty defaults so non-prod deploys can omit them.
+
   VercelDomain:
     Type: String
-    Description: Vercel default project domain (e.g. cloudcanvas-xxx.vercel.app)
+    Default: ""
+    Description: Vercel default project domain (prod only)
 
   CustomDomain:
     Type: String
-    Description: Custom domain for the site (e.g. cloudcanvas.shalev396.com)
+    Default: ""
+    Description: Custom domain for the site (prod only)
 
   ACMCertificateArn:
     Type: String
-    Description: ARN of ACM certificate in us-east-1 for the custom domain
+    Default: ""
+    Description: ACM certificate ARN in us-east-1 (prod only)
 
   HostedZoneId:
-    Type: AWS::Route53::HostedZone::Id
-    Description: Route53 hosted zone ID for the parent domain (e.g. shalev396.com)
+    Type: String
+    Default: ""
+    Description: Route53 hosted zone ID (prod only)
 
   VercelTeamSlug:
     Type: String
-    Description: Vercel team slug (e.g. shalev396)
+    Default: ""
+    Description: Vercel team slug (prod only)
 
   VercelProjectName:
     Type: String
-    Description: Vercel project name (e.g. cloud-canvas)
+    Default: ""
+    Description: Vercel project name (prod only)
 
   VercelOIDCProviderArn:
     Type: String
-    Description: ARN of the existing Vercel OIDC provider in IAM
+    Default: ""
+    Description: Vercel OIDC provider ARN in IAM (prod only)
+
+  # ─── Always required (data resources are deployed to every stage) ───
 
   ImagesBucketName:
     Type: String
@@ -52,12 +64,16 @@ Parameters:
     Type: String
     Description: DynamoDB table name for categories
 
+Conditions:
+  IsProd: !Equals [!Ref Stage, "prod"]
+
 Resources:
   # ─── DynamoDB ────────────────────────────────────────────────────────
 
   ServicesTable:
     Type: AWS::DynamoDB::Table
     UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
     Properties:
       TableName: !Ref ServicesTableName
       BillingMode: PAY_PER_REQUEST
@@ -89,6 +105,7 @@ Resources:
   UsersTable:
     Type: AWS::DynamoDB::Table
     UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
     Properties:
       TableName: !Ref UsersTableName
       BillingMode: PAY_PER_REQUEST
@@ -120,6 +137,7 @@ Resources:
   CategoriesTable:
     Type: AWS::DynamoDB::Table
     UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
     Properties:
       TableName: !Ref CategoriesTableName
       BillingMode: PAY_PER_REQUEST
@@ -139,6 +157,8 @@ Resources:
 
   ImagesBucket:
     Type: AWS::S3::Bucket
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
     Properties:
       BucketName: !Ref ImagesBucketName
       PublicAccessBlockConfiguration:
@@ -154,6 +174,7 @@ Resources:
 
   ImagesBucketPolicy:
     Type: AWS::S3::BucketPolicy
+    Condition: IsProd
     Properties:
       Bucket: !Ref ImagesBucket
       PolicyDocument:
@@ -173,6 +194,7 @@ Resources:
 
   CloudFrontOAC:
     Type: AWS::CloudFront::OriginAccessControl
+    Condition: IsProd
     Properties:
       OriginAccessControlConfig:
         Name: !Sub "cloudcanvas-oac-${Stage}"
@@ -182,6 +204,7 @@ Resources:
 
   CloudFrontDistribution:
     Type: AWS::CloudFront::Distribution
+    Condition: IsProd
     Properties:
       DistributionConfig:
         Enabled: true
@@ -242,6 +265,7 @@ Resources:
 
   CloudFrontDnsRecord:
     Type: AWS::Route53::RecordSet
+    Condition: IsProd
     Properties:
       HostedZoneId: !Ref HostedZoneId
       Name: !Ref CustomDomain
@@ -254,6 +278,7 @@ Resources:
 
   CloudFrontDnsRecordAAAA:
     Type: AWS::Route53::RecordSet
+    Condition: IsProd
     Properties:
       HostedZoneId: !Ref HostedZoneId
       Name: !Ref CustomDomain
@@ -267,6 +292,7 @@ Resources:
 
   VercelAppRole:
     Type: AWS::IAM::Role
+    Condition: IsProd
     Properties:
       RoleName: !Sub "cloudcanvas-vercel-${Stage}"
       AssumeRolePolicyDocument:
@@ -348,10 +374,12 @@ Outputs:
     Value: !Ref ImagesBucket
 
   CloudFrontDomain:
+    Condition: IsProd
     Description: CloudFront distribution domain (point your DNS CNAME here)
     Value: !GetAtt CloudFrontDistribution.DomainName
 
   CloudFrontDistributionId:
+    Condition: IsProd
     Description: CloudFront distribution ID
     Value: !Ref CloudFrontDistribution
 
@@ -360,5 +388,6 @@ Outputs:
     Value: !Ref "AWS::Region"
 
   VercelRoleArn:
+    Condition: IsProd
     Description: IAM Role ARN for Vercel OIDC (set as AWS_ROLE_ARN in Vercel env vars)
     Value: !GetAtt VercelAppRole.Arn

@@ -2,7 +2,6 @@
   "permissions": {
     "allow": [
       "WebSearch",
-      "WebFetch(domain:*)",
       "Bash(npm install:*)",
       "Bash(xargs grep:*)",
       "Bash(npx tsc:*)",

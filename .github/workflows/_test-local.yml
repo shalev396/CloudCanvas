@@ -1,17 +1,22 @@
-# Reusable workflow: Run Postman + Playwright against a LOCAL Next.js server
-# (npm run dev) backed by the {{ environment }}'s real AWS resources.
-# Tests run SEQUENTIALLY: backend (Postman) first, then frontend (Playwright).
-# Both jobs upload their reports to ./artifacts/ for download.
+# Reusable workflow: start Next.js locally and run Postman + Playwright.
+# `mode=dev` runs `npm run dev`. `mode=qa` runs `next build && next start`
+# (equivalent to `npm run qa`, without dotenv since env comes from GH env).
+# `environment` selects which GitHub environment's AWS secrets back the server.
 name: Test Local
 
 on:
   workflow_call:
     inputs:
       environment:
-        description: 'Environment whose AWS resources to use (default: qa)'
+        description: 'GitHub environment for AWS secrets (dev or qa)'
         required: false
         type: string
         default: qa
+      mode:
+        description: 'Server mode: dev (next dev) or qa (next build + next start)'
+        required: false
+        type: string
+        default: dev
 
 permissions:
   id-token: write
@@ -30,6 +35,7 @@ jobs:
       SERVICES_TABLE_NAME: ${{ secrets.SERVICES_TABLE_NAME }}
       USERS_TABLE_NAME: ${{ secrets.USERS_TABLE_NAME }}
       CATEGORIES_TABLE_NAME: ${{ secrets.CATEGORIES_TABLE_NAME }}
+      S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
       ENV: ${{ inputs.environment }}
       SKIP_PLAYWRIGHT_INSTALL: "1"
     steps:
@@ -47,9 +53,14 @@ jobs:
 
       - run: npm ci
 
-      - name: Start Next.js dev and run Postman
+      - name: Start Next.js (${{ inputs.mode }}) and run Postman
         run: |
-          npm run dev &
+          if [ "${{ inputs.mode }}" = "qa" ]; then
+            npx next build --turbopack
+            npx next start &
+          else
+            npm run dev &
+          fi
           SERVER_PID=$!
           for i in $(seq 1 60); do
             code=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 http://localhost:3000/api/services/stats 2>/dev/null || echo "000")
@@ -79,6 +90,7 @@ jobs:
       SERVICES_TABLE_NAME: ${{ secrets.SERVICES_TABLE_NAME }}
       USERS_TABLE_NAME: ${{ secrets.USERS_TABLE_NAME }}
       CATEGORIES_TABLE_NAME: ${{ secrets.CATEGORIES_TABLE_NAME }}
+      S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
       ENV: ${{ inputs.environment }}
       BASE_URL: http://localhost:3000
       API_BASE_URL: http://localhost:3000/api
@@ -99,9 +111,14 @@ jobs:
 
       - run: npm ci
 
-      - name: Start Next.js dev and run Playwright
+      - name: Start Next.js (${{ inputs.mode }}) and run Playwright
         run: |
-          npm run dev &
+          if [ "${{ inputs.mode }}" = "qa" ]; then
+            npx next build --turbopack
+            npx next start &
+          else
+            npm run dev &
+          fi
           SERVER_PID=$!
           for i in $(seq 1 60); do
             code=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 http://localhost:3000/api/services/stats 2>/dev/null || echo "000")

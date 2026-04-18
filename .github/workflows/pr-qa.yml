@@ -1,4 +1,5 @@
-# PR to qa: lint, build, then run local tests (Next.js dev + Postman + Playwright)
+# PR to qa: lint, build, then start `npm run dev` locally (against dev AWS
+# resources) and run Postman + Playwright against it.
 name: PR to QA
 
 on:
@@ -20,4 +21,5 @@ jobs:
     uses: ./.github/workflows/_test-local.yml
     secrets: inherit
     with:
-      environment: qa
+      environment: dev
+      mode: dev
