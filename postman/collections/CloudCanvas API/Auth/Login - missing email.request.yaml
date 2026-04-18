@@ -1,0 +1,24 @@
+$kind: http-request
+name: Login - missing email
+url: '{{baseUrl}}/auth/login'
+method: POST
+auth:
+  type: noauth
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: '{"password":"x"}'
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('Status code is 400', function () {
+          pm.response.to.have.status(400);
+      });
+      pm.test('Returns missing-fields error', function () {
+          const json = pm.response.json();
+          pm.expect(json).to.have.property('success', false);
+          pm.expect(json.error).to.match(/email and password are required/i);
+      });
+    language: text/javascript
+order: 1000

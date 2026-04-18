@@ -296,6 +296,7 @@ export function AdminPanel() {
             ref={restoreInputRef}
             type="file"
             accept=".json"
+            aria-label="Backup JSON file"
             onChange={handleRestoreFileChange}
             className="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90 cursor-pointer"
           />
@@ -504,6 +505,7 @@ export function AdminPanel() {
             ref={seedInputRef}
             type="file"
             accept=".zip"
+            aria-label="AWS architecture icons ZIP file"
             onChange={handleSeedFileChange}
             className="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90 cursor-pointer"
           />

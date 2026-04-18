@@ -4,36 +4,42 @@ Description: CloudCanvas infrastructure - DynamoDB, S3, CloudFront, IAM (Vercel 
 Parameters:
   Stage:
     Type: String
-    AllowedValues: [dev, prod]
+    AllowedValues: [dev, qa, prod]
     Description: Deployment stage
-
-  VercelDomain:
-    Type: String
-    Description: Vercel default project domain (e.g. cloudcanvas-xxx.vercel.app)
 
   CustomDomain:
     Type: String
-    Description: Custom domain for the site (e.g. cloudcanvas.shalev396.com)
+    Description: Custom domain for this stage's CloudFront distribution
 
   ACMCertificateArn:
     Type: String
-    Description: ARN of ACM certificate in us-east-1 for the custom domain
+    Description: ACM certificate ARN in us-east-1 covering CustomDomain
 
   HostedZoneId:
     Type: AWS::Route53::HostedZone::Id
-    Description: Route53 hosted zone ID for the parent domain (e.g. shalev396.com)
+    Description: Route53 hosted zone ID for the parent domain
+
+  VercelDomain:
+    Type: String
+    Default: ""
+    Description: Vercel default project domain (prod only)
 
   VercelTeamSlug:
     Type: String
-    Description: Vercel team slug (e.g. shalev396)
+    Default: ""
+    Description: Vercel team slug (prod only)
 
   VercelProjectName:
     Type: String
-    Description: Vercel project name (e.g. cloud-canvas)
+    Default: ""
+    Description: Vercel project name (prod only)
 
   VercelOIDCProviderArn:
     Type: String
-    Description: ARN of the existing Vercel OIDC provider in IAM
+    Default: ""
+    Description: Vercel OIDC provider ARN in IAM (prod only)
+
+  # ─── Always required (data resources are deployed to every stage) ───
 
   ImagesBucketName:
     Type: String
@@ -52,12 +58,16 @@ Parameters:
     Type: String
     Description: DynamoDB table name for categories
 
+Conditions:
+  IsProd: !Equals [!Ref Stage, "prod"]
+
 Resources:
   # ─── DynamoDB ────────────────────────────────────────────────────────
 
   ServicesTable:
     Type: AWS::DynamoDB::Table
     UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
     Properties:
       TableName: !Ref ServicesTableName
       BillingMode: PAY_PER_REQUEST
@@ -89,6 +99,7 @@ Resources:
   UsersTable:
     Type: AWS::DynamoDB::Table
     UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
     Properties:
       TableName: !Ref UsersTableName
       BillingMode: PAY_PER_REQUEST
@@ -120,6 +131,7 @@ Resources:
   CategoriesTable:
     Type: AWS::DynamoDB::Table
     UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
     Properties:
       TableName: !Ref CategoriesTableName
       BillingMode: PAY_PER_REQUEST
@@ -139,6 +151,8 @@ Resources:
 
   ImagesBucket:
     Type: AWS::S3::Bucket
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
     Properties:
       BucketName: !Ref ImagesBucketName
       PublicAccessBlockConfiguration:
@@ -195,29 +209,50 @@ Resources:
         HttpVersion: http2and3
         DefaultRootObject: ""
 
-        Origins:
-          - Id: S3Images
-            DomainName: !GetAtt ImagesBucket.RegionalDomainName
-            OriginAccessControlId: !Ref CloudFrontOAC
-            S3OriginConfig:
-              OriginAccessIdentity: ""
+        # Prod fronts the Vercel app through CloudFront (default behavior →
+        # Vercel, /images/* → S3). Dev/qa intentionally omit the Vercel origin:
+        # Vercel's firewall on newer projects blocks CloudFront egress IPs, so
+        # the app is reached via its Vercel preview URL directly and CloudFront
+        # on the stage's CustomDomain only serves the image CDN.
+        Origins: !If
+          - IsProd
+          - - Id: S3Images
+              DomainName: !GetAtt ImagesBucket.RegionalDomainName
+              OriginAccessControlId: !Ref CloudFrontOAC
+              S3OriginConfig:
+                OriginAccessIdentity: ""
+            - Id: VercelApp
+              DomainName: !Ref VercelDomain
+              OriginShield:
+                Enabled: false
+              CustomOriginConfig:
+                HTTPSPort: 443
+                OriginProtocolPolicy: https-only
+                OriginSSLProtocols:
+                  - TLSv1.2
+          - - Id: S3Images
+              DomainName: !GetAtt ImagesBucket.RegionalDomainName
+              OriginAccessControlId: !Ref CloudFrontOAC
+              S3OriginConfig:
+                OriginAccessIdentity: ""
 
-          - Id: VercelApp
-            DomainName: !Ref VercelDomain
-            CustomOriginConfig:
-              HTTPSPort: 443
-              OriginProtocolPolicy: https-only
-              OriginSSLProtocols:
-                - TLSv1.2
-
-        DefaultCacheBehavior:
-          TargetOriginId: VercelApp
-          ViewerProtocolPolicy: redirect-to-https
-          AllowedMethods: [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]
-          CachedMethods: [GET, HEAD]
-          CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad  # CachingDisabled
-          OriginRequestPolicyId: 216adef6-5c7f-47e4-b989-5492eafa07d3  # AllViewer
-          Compress: true
+        DefaultCacheBehavior: !If
+          - IsProd
+          - TargetOriginId: VercelApp
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods: [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]
+            CachedMethods: [GET, HEAD]
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad  # CachingDisabled
+            # AllViewer managed policy — forwards all viewer headers (incl. Host)
+            # to Vercel. Matches prod's working configuration.
+            OriginRequestPolicyId: 216adef6-5c7f-47e4-b989-5492eafa07d3
+            Compress: true
+          - TargetOriginId: S3Images
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods: [GET, HEAD]
+            CachedMethods: [GET, HEAD]
+            CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6  # CachingOptimized
+            Compress: true
 
         CacheBehaviors:
           - PathPattern: "/images/*"
@@ -263,6 +298,7 @@ Resources:
 
   VercelAppRole:
     Type: AWS::IAM::Role
+    Condition: IsProd
     Properties:
       RoleName: !Sub "cloudcanvas-vercel-${Stage}"
       AssumeRolePolicyDocument:
@@ -356,5 +392,6 @@ Outputs:
     Value: !Ref "AWS::Region"
 
   VercelRoleArn:
+    Condition: IsProd
     Description: IAM Role ARN for Vercel OIDC (set as AWS_ROLE_ARN in Vercel env vars)
     Value: !GetAtt VercelAppRole.Arn

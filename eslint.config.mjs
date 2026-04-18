@@ -17,6 +17,7 @@ const eslintConfig = [
       ".next/**",
       "out/**",
       "build/**",
+      "artifacts/**", // Playwright-generated reports + bundled third-party JS
       "next-env.d.ts",
       "scripts/**", // Node.js scripts using CommonJS
     ],

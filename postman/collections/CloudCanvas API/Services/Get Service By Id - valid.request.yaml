@@ -1,0 +1,21 @@
+$kind: http-request
+name: Get Service By Id - valid
+url: '{{baseUrl}}/services/id/{{testServiceId}}'
+method: GET
+auth:
+  type: noauth
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('Status code is 200', function () {
+          pm.response.to.have.status(200);
+      });
+      pm.test('Returns the requested service', function () {
+          const json = pm.response.json();
+          const expectedId = pm.collectionVariables.get('testServiceId');
+          pm.expect(json.data).to.have.property('id', expectedId);
+          pm.expect(json.data).to.have.property('name');
+          pm.expect(json.data).to.have.property('iconPath');
+      });
+    language: text/javascript
+order: 3000

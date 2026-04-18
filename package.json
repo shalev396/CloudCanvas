@@ -3,13 +3,23 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "dotenv -e .env.development -- next dev --turbopack",
+    "qa": "dotenv -e .env.qa -- next dev --turbopack",
+    "prod": "dotenv -e .env.production -- next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
-    "prod": "next build --turbopack && next start",
     "lint": "eslint",
     "deploy:dev": "node scripts/deploy.mjs dev",
-    "deploy:prod": "node scripts/deploy.mjs prod"
+    "deploy:qa": "node scripts/deploy.mjs qa",
+    "deploy:prod": "node scripts/deploy.mjs prod",
+    "test:api:dev": "dotenv -e .env.development -- postman collection run \"./postman/collections/CloudCanvas API\" --environment \"./postman/environments/CloudCanvas Local.environment.yaml\"",
+    "test:api:qa": "dotenv -e .env.qa -- postman collection run \"./postman/collections/CloudCanvas API\" --environment \"./postman/environments/CloudCanvas Local.environment.yaml\"",
+    "test:react:dev": "dotenv -e .env.development -- playwright test",
+    "test:react:qa": "dotenv -e .env.qa -- playwright test",
+    "test:dev": "npm run test:api:dev && npm run test:react:dev",
+    "test:qa": "npm run test:api:qa && npm run test:react:qa",
+    "seed:test-admin": "node scripts/seed-test-admin.mjs",
+    "postinstall": "node scripts/postinstall.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.1029.0",
@@ -69,7 +79,9 @@
     "zod": "^4.1.8"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.11.1",
     "@eslint/eslintrc": "^3",
+    "@playwright/test": "^1.59.1",
     "@tailwindcss/postcss": "^4",
     "@tailwindcss/typography": "^0.5.16",
     "@types/bcrypt": "^6.0.0",
@@ -79,8 +91,10 @@
     "@types/react-dom": "^19",
     "@types/uuid": "^10.0.0",
     "dotenv": "^17.2.2",
+    "dotenv-cli": "^11.0.0",
     "eslint": "^9",
     "eslint-config-next": "15.5.15",
+    "postman-cli": "^1.34.0",
     "tailwindcss": "^4",
     "tsx": "^4.19.2",
     "tw-animate-css": "^1.3.8",

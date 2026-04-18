@@ -1,0 +1,21 @@
+$kind: http-request
+name: Backup - admin (200, JSON)
+url: '{{baseUrl}}/admin/backup'
+method: GET
+auth:
+  type: inherit
+  credentials:
+    id: 383fc78f-96ef-47d9-81d5-e4c7dada7326
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('Status code is 200', function () {
+          pm.response.to.have.status(200);
+      });
+      pm.test('Body is valid JSON with services array', function () {
+          const json = pm.response.json();
+          pm.expect(json).to.have.property('services');
+          pm.expect(Array.isArray(json.services)).to.be.true;
+      });
+    language: text/javascript
+order: 2000

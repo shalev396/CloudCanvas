@@ -1,0 +1,24 @@
+# PR to main: lint + build, then run the full test suite against the qa stage
+# using the standard `npm run qa` + `npm run test:qa` commands.
+name: PR to Main
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  lint-build:
+    name: Lint & Build
+    uses: ./.github/workflows/_lint-build.yml
+
+  test:
+    name: Test
+    needs: lint-build
+    uses: ./.github/workflows/_test-local.yml
+    secrets: inherit
+    with:
+      stage: qa

@@ -1,0 +1,76 @@
+# Reusable workflow: starts Next.js locally via `npm <stage>` and runs
+# the combined Postman + Playwright suite via `npm run test:<stage>`. Same
+# commands developers run locally — no CI-specific scripts.
+name: Test Local
+
+on:
+  workflow_call:
+    inputs:
+      stage:
+        description: 'Stage to test (dev or qa)'
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  test:
+    name: Test (${{ inputs.stage }})
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.stage }}
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      SERVICES_TABLE_NAME: ${{ secrets.SERVICES_TABLE_NAME }}
+      USERS_TABLE_NAME: ${{ secrets.USERS_TABLE_NAME }}
+      CATEGORIES_TABLE_NAME: ${{ secrets.CATEGORIES_TABLE_NAME }}
+      S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
+      ENV: ${{ inputs.stage }}
+      BASE_URL: http://localhost:3000
+      API_BASE_URL: http://localhost:3000/api
+      CUSTOM_DOMAIN: ${{ secrets.CUSTOM_DOMAIN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ vars.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/my-github-actions-role
+
+      - run: npm ci
+
+      - name: Start Next.js (${{ inputs.stage }}) in background
+        run: npm run ${{ inputs.stage }} &
+
+      - name: Wait for server ready
+        run: |
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 http://localhost:3000/api/services/stats 2>/dev/null || echo "000")
+            if [ "$code" = "200" ]; then
+              echo "Next.js ready on port 3000"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Next.js failed to start"
+          exit 1
+
+      - name: Run tests (test:${{ inputs.stage }})
+        run: npm run test:${{ inputs.stage }}
+
+      - name: Upload Playwright artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ inputs.stage }}
+          path: artifacts/
+          retention-days: 7

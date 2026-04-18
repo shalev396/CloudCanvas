@@ -1,0 +1,89 @@
+# Reusable workflow: deploy the CloudFormation stack for a stage by running
+# the same `npm run deploy:<stage>` command used locally. Env vars come from
+# the GitHub environment's secrets/vars; deploy.mjs skips the dotenv file
+# (it doesn't exist in CI) and reads straight from process.env.
+name: Deploy
+
+on:
+  workflow_call:
+    inputs:
+      stage:
+        description: 'Deployment stage (dev, qa, prod)'
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy-cfn:
+    name: Deploy CloudFormation (${{ inputs.stage }})
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.stage }}
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      # Always required (DynamoDB + S3 bucket identity)
+      S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
+      SERVICES_TABLE_NAME: ${{ secrets.SERVICES_TABLE_NAME }}
+      USERS_TABLE_NAME: ${{ secrets.USERS_TABLE_NAME }}
+      CATEGORIES_TABLE_NAME: ${{ secrets.CATEGORIES_TABLE_NAME }}
+      # Prod-only (empty for dev/qa — deploy.mjs only validates these when stage=prod)
+      VERCEL_DOMAIN: ${{ secrets.VERCEL_DOMAIN }}
+      CUSTOM_DOMAIN: ${{ secrets.CUSTOM_DOMAIN }}
+      ACM_CERTIFICATE_ARN: ${{ secrets.ACM_CERTIFICATE_ARN }}
+      HOSTED_ZONE_ID: ${{ secrets.HOSTED_ZONE_ID }}
+      VERCEL_TEAM_SLUG: ${{ vars.VERCEL_TEAM_SLUG }}
+      VERCEL_PROJECT_NAME: ${{ vars.VERCEL_PROJECT_NAME }}
+      VERCEL_OIDC_PROVIDER_ARN: ${{ secrets.VERCEL_OIDC_PROVIDER_ARN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ vars.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/my-github-actions-role
+
+      - run: npm ci
+
+      - name: Deploy (npm run deploy:${{ inputs.stage }})
+        run: npm run deploy:${{ inputs.stage }}
+
+      - name: Print stack status
+        run: |
+          aws cloudformation describe-stacks \
+            --stack-name "cloudcanvas-${{ inputs.stage }}" \
+            --query "Stacks[0].StackStatus" \
+            --output text
+
+  wait-for-vercel:
+    name: Wait for Vercel prod deploy
+    if: ${{ inputs.stage == 'prod' }}
+    runs-on: ubuntu-latest
+    needs: deploy-cfn
+    environment:
+      name: ${{ inputs.stage }}
+    steps:
+      - name: Poll until healthy
+        env:
+          BASE_URL: https://${{ secrets.CUSTOM_DOMAIN }}
+        run: |
+          sleep 30
+          for i in $(seq 1 48); do
+            code=$(curl -fsS -o /dev/null -w "%{http_code}" "$BASE_URL/api/services/stats" || echo "000")
+            if [ "$code" = "200" ]; then
+              echo "prod healthy after $i attempts"
+              exit 0
+            fi
+            echo "attempt $i: HTTP $code, sleeping 10s"
+            sleep 10
+          done
+          echo "prod never became healthy"
+          exit 1
