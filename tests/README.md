@@ -52,7 +52,7 @@ Tests read these from [`tests/config.ts`](config.ts):
 | `TEST_ADMIN_EMAIL` | `qa-admin@cloudcanvas.test` | Admin seeded by global-setup |
 | `TEST_ADMIN_PASSWORD` | `qa-admin-password-1234` | Admin password |
 
-In CI ([`.github/workflows/_test-local.yml`](../.github/workflows/_test-local.yml), [`_test-qa.yml`](../.github/workflows/_test-qa.yml)), these come from repo / environment secrets (`CUSTOM_DOMAIN`, `TEST_ADMIN_EMAIL`, `TEST_ADMIN_PASSWORD`). For manual QA runs locally, put the same values in `.env.qa` — see [SETUP.md](../SETUP.md#2-env-files).
+In CI ([`.github/workflows/_test-local.yml`](../.github/workflows/_test-local.yml)), these come from repo / environment secrets. For manual QA runs locally, put the same values in `.env.qa` — see [SETUP.md](../SETUP.md#2-env-files).
 
 ---
 
@@ -159,7 +159,7 @@ On any failing test, Playwright writes artifacts to `artifacts/`:
   - `trace.zip` — Playwright trace for retained failures (`trace: "retain-on-failure"`) — open with `npx playwright show-trace trace.zip` for a timeline with DOM snapshots, network logs, and console output
   - `video.webm` — video of the failed run (`video: "retain-on-failure"`)
 
-In CI, both `_test-local.yml` and `_test-qa.yml` upload the entire `artifacts/` folder as a workflow artifact on any outcome (`if: always()`), so you can download the HTML report + screenshots + traces from any failed Playwright run. Postman failures are shown in the job log (no separate artifact).
+In CI, `_test-local.yml` uploads the entire `artifacts/` folder as a workflow artifact on any outcome (`if: always()`), so you can download the HTML report + screenshots + traces from any failed Playwright run. Postman failures are shown in the job log (no separate artifact).
 
 To rerun a single spec: `npx playwright test tests/e2e/admin/smoke.spec.ts`. Add `--headed --debug` to step through the browser interactively.
 

@@ -31,7 +31,7 @@ The collection logs in as a preset admin. Set these in the environment (or via `
 | `testAdminEmail` | Admin email (Local defaults to `qa-admin@cloudcanvas.test`) |
 | `testAdminPassword` | Admin password (Local defaults to `qa-admin-password-1234`) |
 
-For QA, both are blank in the committed env file — inject them from CI secrets (see `.github/workflows/_test-qa.yml`).
+For QA, both are blank in the committed env file — inject them from CI secrets (see `.github/workflows/_test-local.yml`).
 
 ### 3. Tokens
 

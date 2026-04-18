@@ -2,18 +2,26 @@ import { expect, test } from "@playwright/test";
 import { BASE_URL } from "../../config";
 import { fetchServiceGroups } from "../../helpers/api";
 
-/**
- * Mirrors src/lib/image-url.ts — locally we don't host /images/* from the
- * Next.js public folder; they live behind the dev CloudFront origin.
- */
-const DEV_CDN_ORIGIN = "https://dev.cloudcanvas.shalev396.com";
+// Locally we don't host /images/* from the Next.js public folder; they live
+// behind the stage's CloudFront distribution. CUSTOM_DOMAIN is injected by
+// _test-local.yml from the selected GitHub environment's secrets, so dev/qa
+// each hit their own CDN.
+const CDN_ORIGIN = process.env.CUSTOM_DOMAIN
+  ? `https://${process.env.CUSTOM_DOMAIN}`
+  : "";
+
 function isLocalBase(base: string): boolean {
   return /^https?:\/\/(localhost|127\.0\.0\.1)/i.test(base);
 }
 function resolveIconUrl(iconPath: string, base: string): string {
   if (iconPath.startsWith("http")) return iconPath;
   if (iconPath.startsWith("/images/") && isLocalBase(base)) {
-    return `${DEV_CDN_ORIGIN}${iconPath}`;
+    if (!CDN_ORIGIN) {
+      throw new Error(
+        "CUSTOM_DOMAIN env var is required to resolve /images/* when testing against localhost"
+      );
+    }
+    return `${CDN_ORIGIN}${iconPath}`;
   }
   return `${base}${iconPath}`;
 }
