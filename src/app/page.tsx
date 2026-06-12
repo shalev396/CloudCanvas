@@ -5,16 +5,12 @@ import { getCachedServicesGroupedByCategory } from "@/lib/cached-data";
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const { servicesByCategory, stats } =
-    await getCachedServicesGroupedByCategory();
+  const { servicesByCategory } = await getCachedServicesGroupedByCategory();
 
   return (
     <div className="min-h-screen">
       <Navbar />
-      <ServicesDashboard
-        servicesByCategory={servicesByCategory}
-        serviceStats={stats}
-      />
+      <ServicesDashboard servicesByCategory={servicesByCategory} />
     </div>
   );
 }

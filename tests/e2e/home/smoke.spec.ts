@@ -2,13 +2,10 @@ import { expect, test } from "@playwright/test";
 import { NORMAL_TIMEOUT } from "../../config";
 
 test.describe("home page — smoke", () => {
-  test("renders heading and stats subheader", async ({ page }) => {
+  test("renders heading", async ({ page }) => {
     await page.goto("/");
     await expect(
       page.getByRole("heading", { name: /AWS Services Explorer/i })
-    ).toBeVisible({ timeout: NORMAL_TIMEOUT });
-    await expect(
-      page.getByText(/Currently supports \d+ out of \d+ services/i)
     ).toBeVisible({ timeout: NORMAL_TIMEOUT });
   });
 
