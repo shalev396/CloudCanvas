@@ -45,3 +45,9 @@ next-env.d.ts
 
 *aws-services-seed.json
 *.serverless
+
+*.playwright-mcp
+*docs/aws
+*docs/superpowers
+*scripts/populate-content
+*scripts/generate-diagrams

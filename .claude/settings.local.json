@@ -12,7 +12,8 @@
       "Bash(npx playwright *)",
       "Bash(postman *)",
       "WebFetch(domain:vercel.com)",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ]
   }
 }
