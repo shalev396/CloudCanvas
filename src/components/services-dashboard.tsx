@@ -10,11 +10,6 @@ import Image from "next/image";
 import { ServicesByCategory } from "@/lib/types";
 import { resolveImageUrl } from "@/lib/image-url";
 
-interface ServiceStats {
-  total: number;
-  available: number;
-}
-
 interface CategoryCardProps {
   category: ServicesByCategory;
   onExpand: () => void;
@@ -147,12 +142,10 @@ function CategoryRow({
 
 interface ServicesDashboardProps {
   servicesByCategory: ServicesByCategory[];
-  serviceStats: ServiceStats;
 }
 
 export function ServicesDashboard({
   servicesByCategory: initialServicesByCategory,
-  serviceStats,
 }: ServicesDashboardProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [servicesByCategory] = useState<ServicesByCategory[]>(
@@ -243,10 +236,6 @@ export function ServicesDashboard({
           <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
             AWS Services Explorer
           </h1>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Currently supports {serviceStats.available} out of{" "}
-            {serviceStats.total} services
-          </p>
         </div>
 
         {/* Search Bar */}
