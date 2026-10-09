@@ -15,7 +15,7 @@ const envFile = {
 }[stage];
 config({ path: resolve(process.cwd(), envFile) });
 
-const alwaysRequired = [
+const required = [
   "S3_BUCKET_NAME",
   "SERVICES_TABLE_NAME",
   "USERS_TABLE_NAME",
@@ -23,17 +23,12 @@ const alwaysRequired = [
   "CUSTOM_DOMAIN",
   "ACM_CERTIFICATE_ARN",
   "HOSTED_ZONE_ID",
-];
-
-const prodOnlyRequired = [
   "VERCEL_DOMAIN",
   "VERCEL_TEAM_SLUG",
   "VERCEL_PROJECT_NAME",
   "VERCEL_OIDC_PROVIDER_ARN",
+  "VERCEL_AUTOMATION_BYPASS_SECRET",
 ];
-
-const required =
-  stage === "prod" ? [...alwaysRequired, ...prodOnlyRequired] : alwaysRequired;
 
 const missing = required.filter((key) => !process.env[key]);
 if (missing.length) {
@@ -50,16 +45,14 @@ const params = [
   `CustomDomain=${process.env.CUSTOM_DOMAIN}`,
   `ACMCertificateArn=${process.env.ACM_CERTIFICATE_ARN}`,
   `HostedZoneId=${process.env.HOSTED_ZONE_ID}`,
+  `VercelDomain=${process.env.VERCEL_DOMAIN}`,
+  `VercelTeamSlug=${process.env.VERCEL_TEAM_SLUG}`,
+  `VercelProjectName=${process.env.VERCEL_PROJECT_NAME}`,
+  `VercelOIDCProviderArn=${process.env.VERCEL_OIDC_PROVIDER_ARN}`,
+  `VercelBypassSecret=${process.env.VERCEL_AUTOMATION_BYPASS_SECRET}`,
+  // Always passed so an empty value removes the web ACL.
+  `WafWebAclArn=${process.env.WAF_WEB_ACL_ARN ?? ""}`,
 ];
-
-if (stage === "prod") {
-  params.push(
-    `VercelDomain=${process.env.VERCEL_DOMAIN}`,
-    `VercelTeamSlug=${process.env.VERCEL_TEAM_SLUG}`,
-    `VercelProjectName=${process.env.VERCEL_PROJECT_NAME}`,
-    `VercelOIDCProviderArn=${process.env.VERCEL_OIDC_PROVIDER_ARN}`,
-  );
-}
 
 const cmd = [
   "aws cloudformation deploy",

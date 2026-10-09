@@ -15,3 +15,22 @@ export const BASE_URL = (
 export const API_BASE_URL = (
   process.env.API_BASE_URL ?? `${BASE_URL}/api`
 ).replace(/\/$/, "");
+
+/**
+ * Basic-auth credentials for deployed dev/qa. Only when BASIC_AUTH_PASSWORD
+ * is set and BASE_URL is not localhost; username is the hostname.
+ */
+export function gateHttpCredentials() {
+  const password = (process.env.BASIC_AUTH_PASSWORD ?? "").trim();
+  if (!password || !process.env.BASE_URL) return undefined;
+  const { hostname, origin } = new URL(BASE_URL);
+  if (!hostname || hostname === "localhost" || hostname === "127.0.0.1") {
+    return undefined;
+  }
+  return {
+    username: hostname,
+    password,
+    origin,
+    send: "unauthorized" as const,
+  };
+}

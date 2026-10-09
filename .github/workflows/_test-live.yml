@@ -1,0 +1,44 @@
+# Reusable workflow: runs Playwright against the deployed stage via
+# `npm run test:live:<stage>`.
+name: Test Live
+
+on:
+  workflow_call:
+    inputs:
+      stage:
+        description: 'Deployed stage to test (qa)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test live (${{ inputs.stage }})
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.stage }}
+    env:
+      BASE_URL: https://${{ secrets.CUSTOM_DOMAIN }}
+      API_BASE_URL: https://${{ secrets.CUSTOM_DOMAIN }}/api
+      BASIC_AUTH_PASSWORD: ${{ secrets.BASIC_AUTH_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run tests (test:live:${{ inputs.stage }})
+        run: npm run test:live:${{ inputs.stage }}
+
+      - name: Upload Playwright artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-live-${{ inputs.stage }}
+          path: artifacts/
+          retention-days: 7

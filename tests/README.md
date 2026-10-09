@@ -45,6 +45,7 @@ npm run test:api:qa
 | `npm run test:qa` | Full suite against a `npm run qa` server |
 | `npm run test:react:dev` / `test:react:qa` | Playwright only |
 | `npm run test:api:dev` / `test:api:qa` | Postman only |
+| `npm run test:live:qa` | Playwright against the deployed QA site (needs `BASIC_AUTH_PASSWORD`) |
 | `npm run seed:test-admin` | Manually seed the QA test admin (only if `/api/dev/reset` is unavailable) |
 
 ### URLs and Environment Variables
@@ -57,6 +58,7 @@ Tests read these from [`tests/config.ts`](config.ts):
 | `API_BASE_URL` | `${BASE_URL}/api` | API base (derived if unset) |
 | `TEST_ADMIN_EMAIL` | `qa-admin@cloudcanvas.test` | Admin seeded by global-setup |
 | `TEST_ADMIN_PASSWORD` | `qa-admin-password-1234` | Admin password |
+| `BASIC_AUTH_PASSWORD` | — | Basic auth for deployed dev/qa (username is the hostname). Not used for localhost. |
 
 In CI ([`.github/workflows/_test-local.yml`](../.github/workflows/_test-local.yml)), these come from repo / environment secrets. For manual QA runs locally, put the same values in `.env.qa` — see [SETUP.md](../SETUP.md#2-env-files).
 
