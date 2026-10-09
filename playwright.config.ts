@@ -1,6 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
+import { BASE_URL, gateHttpCredentials } from "./tests/config";
 
-const baseURL = process.env.BASE_URL ?? "http://localhost:3000";
+const httpCredentials = gateHttpCredentials();
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -16,7 +17,8 @@ export default defineConfig({
   outputDir: "artifacts/test-results",
   globalSetup: "./tests/global-setup.ts",
   use: {
-    baseURL,
+    baseURL: BASE_URL,
+    ...(httpCredentials && { httpCredentials }),
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: "retain-on-failure",

@@ -1,5 +1,6 @@
 # PR to main: lint + build, then run the full test suite against the qa stage
-# using the standard `npm run qa` + `npm run test:qa` commands.
+# using the standard `npm run qa` + `npm run test:qa` commands, then
+# Playwright against the deployed QA site.
 name: PR to Main
 
 on:
@@ -19,6 +20,14 @@ jobs:
     name: Test
     needs: lint-build
     uses: ./.github/workflows/_test-local.yml
+    secrets: inherit
+    with:
+      stage: qa
+
+  test-live:
+    name: Test Live
+    needs: test
+    uses: ./.github/workflows/_test-live.yml
     secrets: inherit
     with:
       stage: qa

@@ -1,8 +1,7 @@
 # Unified push workflow — fires on dev, qa, main.
 # Maps the branch name to a stage (dev → dev, qa → qa, main → prod),
 # lints + builds, then calls _deploy.yml. All stages deploy DynamoDB + S3 +
-# CloudFront + Route53; the Vercel OIDC IAM role is prod-only (see
-# cloudformation.yml conditions).
+# CloudFront + Route53 + the Vercel OIDC IAM role.
 name: Push
 
 on:

@@ -30,7 +30,6 @@ jobs:
       SERVICES_TABLE_NAME: ${{ secrets.SERVICES_TABLE_NAME }}
       USERS_TABLE_NAME: ${{ secrets.USERS_TABLE_NAME }}
       CATEGORIES_TABLE_NAME: ${{ secrets.CATEGORIES_TABLE_NAME }}
-      # Prod-only (empty for dev/qa — deploy.mjs only validates these when stage=prod)
       VERCEL_DOMAIN: ${{ secrets.VERCEL_DOMAIN }}
       CUSTOM_DOMAIN: ${{ secrets.CUSTOM_DOMAIN }}
       ACM_CERTIFICATE_ARN: ${{ secrets.ACM_CERTIFICATE_ARN }}
@@ -38,6 +37,8 @@ jobs:
       VERCEL_TEAM_SLUG: ${{ vars.VERCEL_TEAM_SLUG }}
       VERCEL_PROJECT_NAME: ${{ vars.VERCEL_PROJECT_NAME }}
       VERCEL_OIDC_PROVIDER_ARN: ${{ secrets.VERCEL_OIDC_PROVIDER_ARN }}
+      VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+      WAF_WEB_ACL_ARN: ${{ secrets.WAF_WEB_ACL_ARN }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -64,8 +65,7 @@ jobs:
             --output text
 
   wait-for-vercel:
-    name: Wait for Vercel prod deploy
-    if: ${{ inputs.stage == 'prod' }}
+    name: Wait for Vercel deploy (${{ inputs.stage }})
     runs-on: ubuntu-latest
     needs: deploy-cfn
     environment:
@@ -79,11 +79,11 @@ jobs:
           for i in $(seq 1 48); do
             code=$(curl -fsS -o /dev/null -w "%{http_code}" "$BASE_URL/api/services/stats" || echo "000")
             if [ "$code" = "200" ]; then
-              echo "prod healthy after $i attempts"
+              echo "${{ inputs.stage }} healthy after $i attempts"
               exit 0
             fi
             echo "attempt $i: HTTP $code, sleeping 10s"
             sleep 10
           done
-          echo "prod never became healthy"
+          echo "${{ inputs.stage }} never became healthy"
           exit 1

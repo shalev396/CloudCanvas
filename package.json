@@ -18,6 +18,7 @@
     "test:react:qa": "dotenv -e .env.qa -- playwright test",
     "test:dev": "npm run test:api:dev && npm run test:react:dev",
     "test:qa": "npm run test:api:qa && npm run test:react:qa",
+    "test:live:qa": "node scripts/test-live.mjs qa",
     "seed:test-admin": "node scripts/seed-test-admin.mjs",
     "postinstall": "node scripts/postinstall.mjs"
   },
