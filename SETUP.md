@@ -8,13 +8,12 @@ The steps below are the same for both stages — swap `<stage>` for `qa` or `dev
 
 ---
 
-## 1. Vercel — attach the branch to a subdomain
+## 1. Vercel
 
-1. Vercel → your project → **Settings → Domains** → add `<stage>.yourdomain.com` → when prompted, attach it to the **`<stage>`** git branch.
-2. **Settings → Environment Variables** → add the per-stage values as **Preview** variables scoped to the `<stage>` branch, including `AWS_ROLE_ARN` (the stack's `VercelRoleArn` output).
-3. **Settings → Deployment Protection → Protection Bypass for Automation** → add a secret (one per project). It's `VERCEL_AUTOMATION_BYPASS_SECRET`.
+1. **Settings → Environment Variables** → add the per-stage values as **Preview** variables scoped to the `<stage>` branch (`AWS_ROLE_ARN` is added in step 4).
+2. **Settings → Deployment Protection → Protection Bypass for Automation** → add a secret (one per project). It's `VERCEL_AUTOMATION_BYPASS_SECRET`.
 
-Vercel will now auto-deploy that subdomain every time you push to the branch.
+Vercel deploys the branch on every push.
 
 ## 2. GitHub — create the environment + secrets
 
@@ -38,13 +37,13 @@ First deploy takes ~10 minutes (CloudFront is the slow part). Subsequent deploys
 
 ## 4. Finish the OIDC handshake
 
-Once the **prod** CFN stack shows `CREATE_COMPLETE`:
+Once the `cloudcanvas-<stage>` CFN stack shows `CREATE_COMPLETE`:
 
-1. CloudFormation → stack `cloudcanvas-prod` → **Outputs** → copy `VercelRoleArn`.
-2. Vercel → Settings → Environment Variables → paste it as `AWS_ROLE_ARN` for the Production environment.
-3. Vercel → Deployments → latest → ⋮ → **Redeploy**.
+1. CloudFormation → stack `cloudcanvas-<stage>` → **Outputs** → copy `VercelRoleArn`.
+2. Vercel → Settings → Environment Variables → paste it as `AWS_ROLE_ARN` (Production for prod, the `<stage>` branch's Preview variables for dev/qa).
+3. Vercel → Deployments → latest for that branch → ⋮ → **Redeploy**.
 
-This is what lets the deployed Next.js app assume the IAM role via OIDC and read DynamoDB / S3. For dev/qa, set `AWS_ROLE_ARN` on the branch-scoped Preview variables instead.
+This is what lets the deployed Next.js app assume the IAM role via OIDC and read DynamoDB / S3.
 
 ## 5. Seed data
 
