@@ -87,6 +87,9 @@ npm run test:qa        # loads .env.qa
 # Or run just one half
 npm run test:api:dev   # Postman only
 npm run test:react:qa  # Playwright only
+
+# Playwright against the deployed QA site
+npm run test:live:qa
 ```
 
 Full env-file setup and CI artifact download steps in [SETUP.md](SETUP.md).

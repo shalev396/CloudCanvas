@@ -21,23 +21,30 @@ Parameters:
 
   VercelDomain:
     Type: String
-    Default: ""
-    Description: Vercel default project domain (prod only)
+    Description: Vercel deployment domain for this stage
 
   VercelTeamSlug:
     Type: String
-    Default: ""
-    Description: Vercel team slug (prod only)
+    Description: Vercel team slug
 
   VercelProjectName:
     Type: String
-    Default: ""
-    Description: Vercel project name (prod only)
+    Description: Vercel project name
 
   VercelOIDCProviderArn:
     Type: String
+    Description: Vercel OIDC provider ARN in IAM
+
+  VercelBypassSecret:
+    Type: String
+    NoEcho: true
+    MinLength: 1
+    Description: Vercel Protection Bypass for Automation secret
+
+  WafWebAclArn:
+    Type: String
     Default: ""
-    Description: Vercel OIDC provider ARN in IAM (prod only)
+    Description: WAF web ACL ARN to attach (optional)
 
   # ─── Always required (data resources are deployed to every stage) ───
 
@@ -60,6 +67,7 @@ Parameters:
 
 Conditions:
   IsProd: !Equals [!Ref Stage, "prod"]
+  HasWebAcl: !Not [!Equals [!Ref WafWebAclArn, ""]]
 
 Resources:
   # ─── DynamoDB ────────────────────────────────────────────────────────
@@ -208,51 +216,35 @@ Resources:
           MinimumProtocolVersion: TLSv1.2_2021
         HttpVersion: http2and3
         DefaultRootObject: ""
+        WebACLId: !If [HasWebAcl, !Ref WafWebAclArn, !Ref "AWS::NoValue"]
 
-        # Prod fronts the Vercel app through CloudFront (default behavior →
-        # Vercel, /images/* → S3). Dev/qa intentionally omit the Vercel origin:
-        # Vercel's firewall on newer projects blocks CloudFront egress IPs, so
-        # the app is reached via its Vercel preview URL directly and CloudFront
-        # on the stage's CustomDomain only serves the image CDN.
-        Origins: !If
-          - IsProd
-          - - Id: S3Images
-              DomainName: !GetAtt ImagesBucket.RegionalDomainName
-              OriginAccessControlId: !Ref CloudFrontOAC
-              S3OriginConfig:
-                OriginAccessIdentity: ""
-            - Id: VercelApp
-              DomainName: !Ref VercelDomain
-              OriginShield:
-                Enabled: false
-              CustomOriginConfig:
-                HTTPSPort: 443
-                OriginProtocolPolicy: https-only
-                OriginSSLProtocols:
-                  - TLSv1.2
-          - - Id: S3Images
-              DomainName: !GetAtt ImagesBucket.RegionalDomainName
-              OriginAccessControlId: !Ref CloudFrontOAC
-              S3OriginConfig:
-                OriginAccessIdentity: ""
+        # Default behavior → Vercel, /images/* → S3. Host is not forwarded so
+        # Vercel serves its own certificate.
+        Origins:
+          - Id: S3Images
+            DomainName: !GetAtt ImagesBucket.RegionalDomainName
+            OriginAccessControlId: !Ref CloudFrontOAC
+            S3OriginConfig:
+              OriginAccessIdentity: ""
+          - Id: VercelApp
+            DomainName: !Ref VercelDomain
+            OriginCustomHeaders:
+              - HeaderName: x-vercel-protection-bypass
+                HeaderValue: !Ref VercelBypassSecret
+            CustomOriginConfig:
+              HTTPSPort: 443
+              OriginProtocolPolicy: https-only
+              OriginSSLProtocols:
+                - TLSv1.2
 
-        DefaultCacheBehavior: !If
-          - IsProd
-          - TargetOriginId: VercelApp
-            ViewerProtocolPolicy: redirect-to-https
-            AllowedMethods: [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]
-            CachedMethods: [GET, HEAD]
-            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad  # CachingDisabled
-            # AllViewer managed policy — forwards all viewer headers (incl. Host)
-            # to Vercel. Matches prod's working configuration.
-            OriginRequestPolicyId: 216adef6-5c7f-47e4-b989-5492eafa07d3
-            Compress: true
-          - TargetOriginId: S3Images
-            ViewerProtocolPolicy: redirect-to-https
-            AllowedMethods: [GET, HEAD]
-            CachedMethods: [GET, HEAD]
-            CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6  # CachingOptimized
-            Compress: true
+        DefaultCacheBehavior:
+          TargetOriginId: VercelApp
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]
+          CachedMethods: [GET, HEAD]
+          CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad  # CachingDisabled
+          OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac  # AllViewerExceptHostHeader
+          Compress: true
 
         CacheBehaviors:
           - PathPattern: "/images/*"
@@ -298,7 +290,6 @@ Resources:
 
   VercelAppRole:
     Type: AWS::IAM::Role
-    Condition: IsProd
     Properties:
       RoleName: !Sub "cloudcanvas-vercel-${Stage}"
       AssumeRolePolicyDocument:
@@ -312,10 +303,8 @@ Resources:
                 "Action": "sts:AssumeRoleWithWebIdentity",
                 "Condition": {
                   "StringEquals": {
-                    "oidc.vercel.com/${TeamSlug}:aud": "https://vercel.com/${TeamSlug}"
-                  },
-                  "StringLike": {
-                    "oidc.vercel.com/${TeamSlug}:sub": "owner:${TeamSlug}:project:${ProjectName}:*"
+                    "oidc.vercel.com/${TeamSlug}:aud": "https://vercel.com/${TeamSlug}",
+                    "oidc.vercel.com/${TeamSlug}:sub": "owner:${TeamSlug}:project:${ProjectName}:environment:${OidcEnvironment}"
                   }
                 }
               }]
@@ -323,6 +312,7 @@ Resources:
           - OIDCArn: !Ref VercelOIDCProviderArn
             TeamSlug: !Ref VercelTeamSlug
             ProjectName: !Ref VercelProjectName
+            OidcEnvironment: !If [IsProd, "production", "preview"]
       Policies:
         - PolicyName: !Sub "cloudcanvas-app-policy-${Stage}"
           PolicyDocument:
@@ -392,6 +382,5 @@ Outputs:
     Value: !Ref "AWS::Region"
 
   VercelRoleArn:
-    Condition: IsProd
     Description: IAM Role ARN for Vercel OIDC (set as AWS_ROLE_ARN in Vercel env vars)
     Value: !GetAtt VercelAppRole.Arn

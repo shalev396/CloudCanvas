@@ -22,6 +22,7 @@ npm run deploy:qa        # Deploy CloudFormation stack (qa)
 npm run deploy:prod      # Deploy CloudFormation stack (prod)
 npm run test:dev         # Run Postman + Playwright against a `npm run dev` server
 npm run test:qa          # Run Postman + Playwright against a `npm run qa` server
+npm run test:live:qa     # Run Playwright against the deployed QA site
 ```
 
 Tests run against `http://localhost:3000`. Start `npm run <stage>` in one terminal, `npm run test:<stage>` in another. CI uses the same commands — see `.github/workflows/_test-local.yml`.
